@@ -217,11 +217,11 @@ At the time each middleware function is added to the stack, the library ensures 
 
 **Q: Doesn't the http.Request.Context in go 1.7 solve this?**
 
-Have a request-scoped context allows you to pass values bewteen middleware handlers, it's true.  However, there's no guarantee that the values are available, so you get the same run-time bugs that you might get with a naive dependency-injection framework.  In addition, you have to do type-assertions to get your values, so there's another possible source of bugs.  One of the goals of sandwich is to avoid these two types of bugs.
+Have a request-scoped context allows you to pass values between middleware handlers, it's true.  However, there's no guarantee that the values are available, so you get the same run-time bugs that you might get with a naive dependency-injection framework.  In addition, you have to do type-assertions to get your values, so there's another possible source of bugs.  One of the goals of sandwich is to avoid these two types of bugs.
 
 **Q: I like my hand-coded handlers, they are super fast!**
 
-Guess what?! Because of the structure that sandwich imposes on constructing middleware chains, it can automatically generate a pure Go middleware function (with no reflection or depedency injection) to replace the sandwich calls!  So for those ultra time-sensitive functions, you can replace them with fast auto-generated code and still reap the benefits of using sandwich!
+Guess what?! Because of the structure that sandwich imposes on constructing middleware chains, it can generate a pure Go middleware function (with no reflection or depedency injection) to replace the sandwich calls!  So for those ultra time-sensitive functions, you can replace them with fast, generated code and still reap the benefits of using sandwich!
 
 **Q: I don't know, it's still scary and terrible!**
 
