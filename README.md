@@ -203,8 +203,6 @@ Not compared to everything else a webserver needs to do.
 
 Yes, sandwich's reflection-based dependency-injection code is slower than middleware code that directly calls functions, however **the vast majority of server code (especially during development) is not impacted by time spent calling a few functions, but rather by HTTP network I/O, request parsing, database I/O, response marshalling, etc.**
 
-The real time difference in calls is ~1000ns/call for reflection vs only 2ns/call for direct calls.  1000ns is noise for most HTTP handlers which typically last 2-5ms (so that's a 0.05% slowdown -- less than 1%).
-
 **Q: Ok, but aren't both reflection and dependency-injection non-idiomatic Go?**
 
 Sorta.  The use of reflection in and of itself isn't non-idiomatic, but the use of magical dependency injection is:  Go eschews magic.
