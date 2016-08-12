@@ -21,8 +21,8 @@ func New() Middleware {
 
 func TheUsual() Middleware {
 	return New().
-		Then(sandwich.WrapResponseWriter, sandwich.StartLog).
-		Defer((*sandwich.LogEntry).Commit).
+		With(sandwich.WrapResponseWriter).
+		Wrap(sandwich.StartLog, (*sandwich.LogEntry).Commit).
 		OnErr(sandwich.HandleError)
 }
 
@@ -32,9 +32,16 @@ func (m Middleware) Provide(val interface{}) Middleware { return Middleware{m.c.
 func (m Middleware) ProvideAs(val, ifacePtr interface{}) Middleware {
 	return Middleware{m.c.ProvideAs(val, ifacePtr)}
 }
-func (m Middleware) Then(handlers ...interface{}) Middleware { return Middleware{m.c.Then(handlers...)} }
+func (m Middleware) With(handlers ...interface{}) Middleware { return Middleware{m.c.With(handlers...)} }
 func (m Middleware) OnErr(handler interface{}) Middleware    { return Middleware{m.c.OnErr(handler)} }
-func (m Middleware) Defer(handler interface{}) Middleware    { return Middleware{m.c.Defer(handler)} }
+func (m Middleware) Wrap(before, after interface{}) Middleware {
+	c := m.c
+	if before != nil {
+		c = c.With(before)
+	}
+	c = c.Defer(after)
+	return Middleware{c}
+}
 func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, p martini.Params) {
 	if err := m.c.Run((*http.ResponseWriter)(&w), r, p); err != nil {
 		panic(err)

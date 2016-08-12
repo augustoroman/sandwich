@@ -27,7 +27,7 @@
 //
 //   func main() {
 //       mw := sandwich.TheUsual()
-//       http.Handle("/", mw.Then(func(w http.ResponseWriter) {
+//       http.Handle("/", mw.With(func(w http.ResponseWriter) {
 //           fmt.Fprintf(w, "Hello world!")
 //       }))
 //       if err := http.ListenAndServe(":6060", nil); err != nil {
@@ -47,7 +47,7 @@
 //   func main() {
 //       db_conn := ConnectToDatabase(...)
 //       mw := sandwich.TheUsual().Provide(db_conn)
-//       http.Handle("/", mw.Then(home))
+//       http.Handle("/", mw.With(home))
 //   }
 //
 //   func Home(w http.ResponseWriter, r *http.Request, db_conn *Database) {
@@ -63,8 +63,8 @@
 // example extracting the user login:
 //
 //   func main() {
-//       mw := sandwich.TheUsual().Then(ParseUserCookie)
-//       http.Handle("/", mw.Then(SayHi))
+//       mw := sandwich.TheUsual().With(ParseUserCookie)
+//       http.Handle("/", mw.With(SayHi))
 //   }
 //   // You can write & test exactly this signature:
 //   func ParseUserCookie(r *http.Request) (User, error) { ... }
@@ -97,14 +97,39 @@
 // values.
 //
 //
-// Deferred Handlers
+// Wrapping Handlers
 //
-// Sandwich also allows registering handlers to run AFTER the middleware stack
-// as completed, analogous to Go's defer statement.  These are run regardless
-// of whether an error aborted the normal handler processing and after any
-// error handler has executed.  As with the defer statement, they are typically
-// used for cleanup and finalization, for example flushing a gzip writer or
-// writing the request log entry.
+// Sandwich also allows registering handlers to run during AND after the middleware
+// (and error handling) stack has completed.  This is especially useful for handles
+// such as logging or gzip wrappers.  Once the before handle is run, the 'after'
+// handlers are queued to run and will be run regardless of whether an error aborts
+// any subsequent middleware handlers.
+//
+// Typically this is done with the first function creating and initializing some
+// state to pass to the deferred handler.  For example, the logging handlers
+// are:
+//
+//   // StartLog creates a *LogEntry and initializes it with basic request
+//   // information.
+//   func StartLog(r *http.Request) *LogEntry {
+//     return &LogEntry{Start: time.Now(), ...}
+//   }
+//
+//   // Commit fills in the remaining *LogEntry fields and writes the entry out.
+//   func (entry *LogEntry) Commit(w *ResponseWriter) {
+//     entry.Elapsed = time.Since(entry.Start)
+//     ...
+//     WriteLog(*entry)
+//   }
+//
+// and are added to the chain using:
+//
+//     Wrap(StartLog, (*LogEntry).Commit)
+//
+// In this case, StartLog returns a *LogEntry that is then provided to downstream
+// handlers, including the deferred Commit handler -- in this case a
+// method expression (https://golang.org/ref/spec#Method_expressions) that takes
+// the *LogEntry as its value receiver.
 //
 //
 // Providing Interfaces
@@ -133,11 +158,11 @@
 //   udb_iface := UserDatabase(udb)
 //   mw.Provide(&udb_iface)
 //
-// Instead, you have to either use ProvideAs() or Then():
+// Instead, you have to either use ProvideAs() or With():
 //
 //   udb := &userDbImpl{...}
 //   mw.ProvideAs(udb, (*UserDatabase)(nil))  // either use ProvideAs() with a pointer to the interface
-//   mw.Then(func() UserDatabase { return udb }) // or add a handler that returns the interface
+//   mw.With(func() UserDatabase { return udb }) // or add a handler that returns the interface
 //
 // It's a bit silly, but that's how it is.
 package sandwich

@@ -1,6 +1,6 @@
-<img align="right" height=400 src="https://upload.wikimedia.org/wikipedia/commons/2/29/Dagwood_sandwich.jpg" />
+<img align="right" height=400 src="http://s3.amazonaws.com/foodspotting-ec2/reviews/3957590/thumb_600.jpg?1377120135" />
 
-# Sandwich HTTP Middleware [![GoDoc](https://godoc.org/github.com/augustoroman/sandwich?status.png)](http://godoc.org/github.com/augustoroman/sandwich)
+# Sandwich: Delicious HTTP Middleware [![GoDoc](https://godoc.org/github.com/augustoroman/sandwich?status.png)](http://godoc.org/github.com/augustoroman/sandwich)
 
 *Keep pilin' it on!*
 
@@ -28,7 +28,7 @@ Here's a very simple example of using sandwich with the standard HTTP stack:
 
    func main() {
        mw := sandwich.TheUsual()
-       http.Handle("/", mw.Then(func(w http.ResponseWriter) {
+       http.Handle("/", mw.With(func(w http.ResponseWriter) {
            fmt.Fprintf(w, "Hello world!")
        }))
        if err := http.ListenAndServe(":6060", nil); err != nil {
@@ -38,15 +38,6 @@ Here's a very simple example of using sandwich with the standard HTTP stack:
 ```
 
 For more examples, see the examples directory.
-
-## Overview
-
-Sandwich is a middleware library designed with the following goals in mind:
-
-* Make it really easy to write *testable* HTTP server code.
-* Make it easy to write correct and *debuggable* HTTP server code.
-* Make it easy to do *robust and consistent error handling* that differentiates between logging internal error details, choosing an appropriate status code, and sending an appropriate external error message.
-* Make it *possible to convert that to extremely fast HTTP server code* once the easy and correct code is done.
 
 
 ## Usage
@@ -63,7 +54,7 @@ For example, you can use this to provide your database to all handlers:
   func main() {
       db_conn := ConnectToDatabase(...)
       mw := sandwich.TheUsual().Provide(db_conn)
-      http.Handle("/", mw.Then(home))
+      http.Handle("/", mw.With(home))
   }
 
   func Home(w http.ResponseWriter, r *http.Request, db_conn *Database) {
@@ -74,6 +65,7 @@ For example, you can use this to provide your database to all handlers:
 Provide(...) and ProvideAs(...) are excellent alternatives to using global
 values, plus they keep your functions easy to test!
 
+
 ### Handlers
 
 In many cases you want to initialize a value based on the request, for
@@ -81,8 +73,8 @@ example extracting the user login:
 
 ```go
   func main() {
-      mw := sandwich.TheUsual().Then(ParseUserCookie)
-      http.Handle("/", mw.Then(SayHi))
+      mw := sandwich.TheUsual().With(ParseUserCookie)
+      http.Handle("/", mw.With(SayHi))
   }
   // You can write & test exactly this signature:
   func ParseUserCookie(r *http.Request) (User, error) { ... }
@@ -95,10 +87,10 @@ example extracting the user login:
 This starts to show off the real power of sandwich.  For each request, the
 following occurs:
 
-  * First ParseUserCookie is called.  If it returns a non-nil error,
-    sandwich's HandleError is called the request is aborted.  If the error
+  * First `ParseUserCookie` is called.  If it returns a non-nil error,
+    sandwich's `HandleError` is called and the request is aborted.  If the error
     is nil, processing continues.
-  * Next SayHi is called with the User value returned from ParseUserCookie.
+  * Next `SayHi` is called with `User` returned from `ParseUserCookie`.
 
 This allows you to write small, independently testable functions and let
 sandwich chain them together for you.  Sandwich works hard to ensure that
@@ -117,14 +109,43 @@ middleware stack as well as the error type.  They must not have any return
 values.
 
 
-### Deferred Handlers
+### Wrapping Handlers
 
-Sandwich also allows registering handlers to run AFTER the middleware stack
-as completed, analogous to Go's defer statement.  These are run regardless
-of whether an error aborted the normal handler processing and after any
-error handler has executed.  As with the defer statement, they are typically
-used for cleanup and finalization, for example flushing a gzip writer or
-writing the request log entry.
+Sandwich also allows registering handlers to run during AND after the middleware
+(and error handling) stack has completed.  This is especially useful for handles
+such as logging or gzip wrappers.  Once the before handle is run, the 'after'
+handlers are queued to run and will be run regardless of whether an error aborts
+any subsequent middleware handlers.
+
+Typically this is done with the first function creating and initializing some
+state to pass to the deferred handler.  For example, the logging handlers
+are:
+
+```go
+  // StartLog creates a *LogEntry and initializes it with basic request
+  // information.
+  func StartLog(r *http.Request) *LogEntry {
+    return &LogEntry{Start: time.Now(), ...}
+  }
+
+  // Commit fills in the remaining *LogEntry fields and writes the entry out.
+  func (entry *LogEntry) Commit(w *ResponseWriter) {
+    entry.Elapsed = time.Since(entry.Start)
+    ...
+    WriteLog(*entry)
+  }
+```
+
+and are added to the chain using:
+
+```go
+    Wrap(StartLog, (*LogEntry).Commit)
+```
+
+In this case, `StartLog` returns a `*LogEntry` that is then provided to downstream
+handlers, including the deferred Commit handler -- in this case a
+[method expression](https://golang.org/ref/spec#Method_expressions) that takes
+the `*LogEntry` as its value receiver.
 
 
 ### Providing Interfaces
@@ -155,17 +176,18 @@ You cannot provide this to handlers directly via the Provide() call.
   mw.Provide(&udb_iface)          // STILL DOESN'T WORK!
 ```
 
-Instead, you have to either use ProvideAs() or Then():
+Instead, you have to either use ProvideAs() or With():
 
 ```go
   udb := &userDbImpl{...}
   // either use ProvideAs() with a pointer to the interface
   mw.ProvideAs(udb, (*UserDatabase)(nil))
   // or add a handler that returns the interface
-  mw.Then(func() UserDatabase { return udb })
+  mw.With(func() UserDatabase { return udb })
 ```
 
-It's a bit silly, but that's how it is.
+It's a bit silly, but there you are.
+
 
 ## FAQ
 
@@ -193,7 +215,7 @@ However, one of the major goals of this library is to allow the HTTP handler cod
 
 While it's true that you can't get the same compile-time checking that you do with direct-call-based middleware, sandwich works really hard to ensure that you don't get surprises while running your server.
 
-At the time each middleware function is added to the stack, the library ensure that it's dependencies have been explicitly provided.  One of the *features* of sandwich is that you can't arbitrary inject values -- they need to have an explicit provisioning source.
+At the time each middleware function is added to the stack, the library ensures that it's dependencies have been explicitly provided.  One of the *features* of sandwich is that you can't arbitrary inject values -- they need to have an explicit provisioning source.
 
 **Q: Doesn't the http.Request.Context in go 1.7 solve this?**
 
@@ -205,4 +227,4 @@ Guess what?! Because of the structure that sandwich imposes on constructing midd
 
 **Q: I don't know, it's still scary and terrible!**
 
-I hope you don't get scared off by all this talk.  Take a look and the library, try it out, and I hope you enjoy it. If you don't, there are lots of great alternatives.
+I hope you don't get scared off by all this talk.  Take a look at the library, try it out, and I hope you enjoy it. If you don't, there are lots of great alternatives.

@@ -20,8 +20,8 @@ func TestParamsRouting(t *testing.T) {
 		http.Error(w, "Param "+key+" not found", http.StatusNotFound)
 	}
 	mw := New()
-	r.GET("/foo/:arg", mw.Provide("arg").Then(printParam).ServeHTTP)
-	r.GET("/bar/:baz", mw.Provide("baz").Then(printParam).ServeHTTP)
+	r.GET("/foo/:arg", mw.Provide("arg").With(printParam).ServeHTTP)
+	r.GET("/bar/:baz", mw.Provide("baz").With(printParam).ServeHTTP)
 
 	rw := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/foo/asdf", nil)

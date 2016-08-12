@@ -22,8 +22,8 @@ func New() Middleware {
 // handling.
 func TheUsual() Middleware {
 	return New().
-		Then(WrapResponseWriter, StartLog).
-		Defer((*LogEntry).Commit).
+		With(WrapResponseWriter).
+		Wrap(StartLog, (*LogEntry).Commit).
 		OnErr(HandleError)
 }
 
@@ -50,12 +50,12 @@ func (m Middleware) ProvideAs(val, ifacePtr interface{}) Middleware {
 	return Middleware{m.c.ProvideAs(val, ifacePtr)}
 }
 
-// Then adds one or more middleware handles to the stack.  Middleware handlers
+// With adds one or more middleware handles to the stack.  Middleware handlers
 // may use any of the values previously provided either directly via
 // Provide(...) or from the return values of previous handlers in the entire
 // middleware stack.
-func (m Middleware) Then(handlers ...interface{}) Middleware {
-	return Middleware{m.c.Then(handlers...)}
+func (m Middleware) With(handlers ...interface{}) Middleware {
+	return Middleware{m.c.With(handlers...)}
 }
 
 // OnErr adds a new error handler to the middleware stack.  The error handler
@@ -66,14 +66,21 @@ func (m Middleware) OnErr(handler interface{}) Middleware {
 	return Middleware{m.c.OnErr(handler)}
 }
 
-// Defer adds a handler to be called after all normal handlers (and any error
-// handler, if applicable) have been called.  Defers are executed in reverse
-// order that they are added to the stack, analogous to Go's defer
-// functionality.  If a middleware handler errors out and the middleware chain
-// is aborted before it gets to the deferred handler, it will not be called.
-// Defer'd handlers may not return any values.
-func (m Middleware) Defer(handler interface{}) Middleware {
-	return Middleware{m.c.Defer(handler)}
+// Wrap adds two handlers: one that is called during the normal middleware
+// progression ('before') and one that is deferred until all other middleware
+// handlers and error handlers ('after') have been called.  Deferred handlers
+// are called in the reverse order that they are added, and may not return any
+// values.  The 'after' handler will only be run if the 'before' handler has run
+// -- if the middleware chain is aborted before getting to 'before' (or if
+// 'before' returns an error), 'after' will not be called.  The 'before' handler
+// may be nil in which case only the after handler will be registered.
+func (m Middleware) Wrap(before, after interface{}) Middleware {
+	c := m.c
+	if before != nil {
+		c = c.With(before)
+	}
+	c = c.Defer(after)
+	return Middleware{c}
 }
 
 // ServerHTTP implements the http.Handler interface and provides the initial

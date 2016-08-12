@@ -22,7 +22,7 @@ func Generated_ShowLandingPage(
 		sandwich_LogEntry_ptr_val = sandwich.StartLog(http_Request_ptr_val)
 
 		defer func() {
-			(*sandwich.LogEntry).Commit(sandwich_LogEntry_ptr_val, sandwich_ResponseWriter_ptr_val, sandwich_LogEntry_ptr_val)
+			(*sandwich.LogEntry).Commit(sandwich_LogEntry_ptr_val, sandwich_ResponseWriter_ptr_val)
 		}()
 
 		var main_User_ptr_val *User
@@ -55,7 +55,7 @@ func Generated_ShowUserProfile(
 		sandwich_LogEntry_ptr_val = sandwich.StartLog(http_Request_ptr_val)
 
 		defer func() {
-			(*sandwich.LogEntry).Commit(sandwich_LogEntry_ptr_val, sandwich_ResponseWriter_ptr_val, sandwich_LogEntry_ptr_val)
+			(*sandwich.LogEntry).Commit(sandwich_LogEntry_ptr_val, sandwich_ResponseWriter_ptr_val)
 		}()
 
 		var main_User_ptr_val *User

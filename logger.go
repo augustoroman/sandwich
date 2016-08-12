@@ -50,7 +50,7 @@ func StartLog(r *http.Request) *LogEntry {
 }
 
 // Commit fills in the remaining *LogEntry fields and writes the entry out.
-func (l *LogEntry) Commit(w *ResponseWriter, entry *LogEntry) {
+func (entry *LogEntry) Commit(w *ResponseWriter) {
 	entry.Elapsed = time_Now().Sub(entry.Start)
 	entry.ResponseSize = w.Size
 	entry.StatusCode = w.Code
@@ -63,7 +63,7 @@ func (l *LogEntry) Commit(w *ResponseWriter, entry *LogEntry) {
 var WriteLog = func(e LogEntry) {
 	col, reset := "", ""
 	if e.StatusCode >= 400 || e.Error != nil {
-		col, reset = "\033[95;104m", "\033[0m" // high-intensity red + reset
+		col, reset = "\033[91m", "\033[0m" // high-intensity red + reset
 	}
 	fmt.Fprintf(os.Stderr, "%s%s %s \"%s %s\" (%d %dB %s) %s%s\n",
 		col,

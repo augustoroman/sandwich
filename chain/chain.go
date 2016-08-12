@@ -68,7 +68,7 @@ func (c Chain) Reserve(typePtr interface{}) Chain {
 }
 
 // Provide an immediate value.  This cannot be used to provide an interface,
-// instead use ProvideAs(...) or Then(...) with a function that returns the
+// instead use ProvideAs(...) or With(...) with a function that returns the
 // interface.
 func (c Chain) Provide(value interface{}) Chain {
 	if value == nil {
@@ -116,17 +116,17 @@ func (c Chain) typesAvailable() map[reflect.Type]bool {
 	return m
 }
 
-// Then adds one or more handlers to the middleware chain.
-func (c Chain) Then(handlers ...interface{}) Chain {
+// With adds one or more handlers to the middleware chain.
+func (c Chain) With(handlers ...interface{}) Chain {
 	steps := make([]step, len(handlers))
 	available := c.typesAvailable()
 	for i, handler := range handlers {
 		fn, err := valueOfFunction(handler)
 		if err != nil {
-			panicf("%s arg of Then(...) %v", ordinalize(i+1), err)
+			panicf("%s arg of With(...) %v", ordinalize(i+1), err)
 		}
 		if err := checkCanCall(available, fn); err != nil {
-			panicf("%s arg of Then(...) %v", ordinalize(i+1), err)
+			panicf("%s arg of With(...) %v", ordinalize(i+1), err)
 		}
 		fnType := fn.Func.Type()
 		steps[i] = step{tPRE_HANDLER, fn.Func, fnType}

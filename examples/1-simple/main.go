@@ -40,16 +40,16 @@ func main() {
 		ProvideAs(udb, (*UserDb)(nil)).
 		// In this example, we'll always check to see if the user is logged in.
 		// If so, we'll add a note to the log entries.
-		Then(ParseUserIfLoggedIn)
+		With(ParseUserIfLoggedIn)
 
 	// If the user is logged in, they'll get a personalized landing page.  Otherwise,
 	// they'll get a generic landing page.
-	http.Handle("/", mw.Then(ShowLandingPage))
-	http.Handle("/login", mw.Then(Login))
+	http.Handle("/", mw.With(ShowLandingPage))
+	http.Handle("/login", mw.With(Login))
 
 	// Some pages are only allowed if the user is logged in.
-	authed := mw.Then(FailIfNotAuthenticated)
-	http.Handle("/user/profile", authed.Then(ShowUserProfile))
+	authed := mw.With(FailIfNotAuthenticated)
+	http.Handle("/user/profile", authed.With(ShowUserProfile))
 
 	// Comparison to the auto-generated profile page.
 	http.HandleFunc("/user/profile/gen", Generated_ShowUserProfile(udb))
@@ -59,7 +59,7 @@ func main() {
 	http.HandleFunc("/hand", func(w http.ResponseWriter, r *http.Request) {
 		w, rw := sandwich.WrapResponseWriter(w)
 		e := sandwich.StartLog(r)
-		defer e.Commit(rw, e)
+		defer e.Commit(rw)
 		u, err := ParseUserIfLoggedIn(r, udb, e)
 		if err != nil {
 			sandwich.HandleError(w, r, e, err)
