@@ -39,6 +39,14 @@ Here's a very simple example of using sandwich with the standard HTTP stack:
 
 For more examples, see the examples directory.
 
+Note that *sandwich doesn't provide any routing*.  You can use it with any other
+router, for example:
+
+* [net/http](https://godoc.org/net/http) stdlib router
+* [httprouter](https://godoc.org/github.com/julienschmidt/httprouter) (use the [httprouter_sandwich](https://godoc.org/github.com/augustoroman/sandwich/httprouter_sandwich) adapter)
+* [gorilla/mux](http://www.gorillatoolkit.org/pkg/mux)
+* [martini](https://github.com/go-martini/martini) (use the [martini_sandwich](https://godoc.org/github.com/augustoroman/sandwich/martini_sandwich) adapter)
+* ...or any other one you like.
 
 ## Usage
 
