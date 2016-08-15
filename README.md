@@ -242,7 +242,7 @@ Compared to martini, sandwich DOESN'T:
 
 * ...have a router, it's only middleware handling.  You can use martini, httprouter, the default Go lib, etc to do routing.
 
-* ...stop processing middleware when something is written to the response.  You must return an error to abort the middleware processing.
+* ...stop processing middleware when something is written to the response.  You must return an error (e.g. [sandwich.Done](https://godoc.org/github.com/augustoroman/sandwich#pkg-variables)) to abort the middleware processing.
 
 * ...do some of the more esoteric things that martini does, like if a handler returns a string, then Martini assumes that's the response.  I've never seen those used outside of toy examples.
 
