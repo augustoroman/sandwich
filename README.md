@@ -238,7 +238,7 @@ Sandwich uses reflection-based dependency-injection to call the middleware funct
 
 **Q: How does this compare to [martini](https://github.com/go-martini/martini)?**
 
-Compared to martini, sandwich DOESN'T:
+For those of you familiar with martini, sandwich has a lot of similarities but isn't exactly the same.  Compared to martini, sandwich DOESN'T:
 
 * ...have a router, it's only middleware handling.  You can use martini, httprouter, the default Go lib, etc to do routing.
 
