@@ -7,6 +7,7 @@
 ## Features
 
 * Keeps middleware simple and testable.
+* Consolidates error handling.
 * Ensures that middleware dependencies are safely provided -- avoids unsafe casting from generic context objects.
 * Detects missing dependencies during route initialization.
 * Provides clear and helpful error messages.
@@ -116,6 +117,38 @@ Error handlers may accept any types that have been provided so far in the
 middleware stack as well as the error type.  They must not have any return
 values.
 
+Here's an example of rendering errors with a custom error page:
+
+```go
+  type ErrorPageTemplate *template.Template
+  func main() {
+      tpl := template.Must(template.ParseFiles("path/to/my/error_page.tpl"))
+      s := sandwich.TheUsual().
+          Provide(ErrorPageTemplate(tpl)).
+          OnErr(MyErrorHandler)
+      ...
+  }
+  func MyErrorHandler(w http.ResponseWriter, t ErrorPageTemplate, l *sandwich.LogEntry, err error) {
+      if err == sandwich.Done {  // sandwich.Done can be returned to abort middleware.
+          return                 // It indicates there was no actual error, so just return.
+      }
+      // Unwrap to a sandwich.Error that has Code, ClientMsg, and internal LogMsg.
+      e := sandwich.ToError(err)
+      // If there's an internal log message, add it to the request log.
+      e.LogIfMsg(l)
+      // Respond with my custom html error page, including the client-facing msg.
+      w.WriteHeader(e.Code)
+      t.Execute(w, map[string]string{Msg: e.ClientMsg})
+  }
+```
+
+Error handlers allow you consolidate the error handling of your web app.  You
+can customize the error page, assign user-facing error codes, detect and fire
+alerts for certain errors, and control which errors get logged -- all in one
+place.
+
+Sandwich never sends internal error details to the client and insteads logs the
+details.
 
 ### Wrapping Handlers
 
