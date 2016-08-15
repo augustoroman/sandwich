@@ -201,6 +201,22 @@ It's a bit silly, but there you are.
 
 Sandwich uses reflection-based dependency-injection to call the middleware functions with the parameters they need.
 
+**Q: How does this compare to [martini](https://github.com/go-martini/martini)?**
+
+Compared to martini, sandwich DOESN'T:
+
+* ...have a router, it's only middleware handling.  You can use martini, httprouter, the default Go lib, etc to do routing.
+
+* ...stop processing middleware when something is written to the response.  You must return an error to abort the middleware processing.
+
+* ...do some of the more esoteric things that martini does, like if a handler returns a string, then Martini assumes that's the response.  I've never seen those used outside of toy examples.
+
+On the other hand, sandwich DOES:
+
+* ...explicitly ensure that dependencies must be provided by enforcing that inputs to middleware are provided as return values of previous middleware.  Failures occur at route creation rather than during an HTTP call.
+
+* ...special-case error return values and provide explicit, consolidated error handling in the middleware chain.
+
 **Q: OMG reflection and dependency-injection, isn't that terrible and slow and non-idiomatic go?!**
 
 Whoa, nelly.  Let's deal with those one at time, m'kay?
