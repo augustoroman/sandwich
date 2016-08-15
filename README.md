@@ -28,8 +28,10 @@ Here's a very simple example of using sandwich with the standard HTTP stack:
    )
 
    func main() {
-       mw := sandwich.TheUsual()
-       http.Handle("/", mw.With(func(w http.ResponseWriter) {
+       // Create a default sandwich middlware stack that includes logging and
+       // a simple error handler.
+       s := sandwich.TheUsual()
+       http.Handle("/", s.With(func(w http.ResponseWriter) {
            fmt.Fprintf(w, "Hello world!")
        }))
        if err := http.ListenAndServe(":6060", nil); err != nil {
@@ -62,8 +64,8 @@ For example, you can use this to provide your database to all handlers:
 ```go
   func main() {
       db_conn := ConnectToDatabase(...)
-      mw := sandwich.TheUsual().Provide(db_conn)
-      http.Handle("/", mw.With(home))
+      s := sandwich.TheUsual().Provide(db_conn)
+      http.Handle("/", s.With(home))
   }
 
   func Home(w http.ResponseWriter, r *http.Request, db_conn *Database) {
@@ -82,8 +84,8 @@ example extracting the user login:
 
 ```go
   func main() {
-      mw := sandwich.TheUsual().With(ParseUserCookie)
-      http.Handle("/", mw.With(SayHi))
+      s := sandwich.TheUsual().With(ParseUserCookie)
+      http.Handle("/", s.With(SayHi))
   }
   // You can write & test exactly this signature:
   func ParseUserCookie(r *http.Request) (User, error) { ... }
@@ -211,10 +213,10 @@ You cannot provide this to handlers directly via the Provide() call.
 ```go
   udb := &userDbImpl{...}
   // DOESN'T WORK: this will provide *userDbImpl, not UserDatabase
-  mw.Provide(udb)
-  mw.Provide((UserDatabase)(udb)) // DOESN'T WORK EITHER
+  s.Provide(udb)
+  s.Provide((UserDatabase)(udb)) // DOESN'T WORK EITHER
   udb_iface := UserDatabase(udb)
-  mw.Provide(&udb_iface)          // STILL DOESN'T WORK!
+  s.Provide(&udb_iface)          // STILL DOESN'T WORK!
 ```
 
 Instead, you have to either use ProvideAs() or With():
@@ -222,9 +224,9 @@ Instead, you have to either use ProvideAs() or With():
 ```go
   udb := &userDbImpl{...}
   // either use ProvideAs() with a pointer to the interface
-  mw.ProvideAs(udb, (*UserDatabase)(nil))
+  s.ProvideAs(udb, (*UserDatabase)(nil))
   // or add a handler that returns the interface
-  mw.With(func() UserDatabase { return udb })
+  s.With(func() UserDatabase { return udb })
 ```
 
 It's a bit silly, but there you are.
