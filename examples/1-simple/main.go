@@ -27,7 +27,7 @@ func main() {
 		// Inject config and user database; now available to all handlers.
 		ProvideAs(udb, (*UserDb)(nil)).
 		// In this example, we'll always check to see if the user is logged in.
-		// If so, we'll add a note to the log entries.
+		// If so, we'll add the user ID to the log entries.
 		With(ParseUserIfLoggedIn)
 
 	// If the user is logged in, they'll get a personalized landing page.
