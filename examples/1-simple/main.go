@@ -9,29 +9,17 @@ import (
 	"github.com/augustoroman/sandwich"
 )
 
-type User struct{ Id, Name, Email string }
-
+// Interface for abstracting out the user database.
 type UserDb interface {
 	Lookup(id string) (User, error)
 }
-
-type userDb []User
-
-func (udb userDb) Lookup(id string) (User, error) {
-	for _, u := range udb {
-		if id == u.Id {
-			return u, nil
-		}
-	}
-	return User{}, fmt.Errorf("no such user %q", id)
-}
+type User struct{ Id, Name, Email string }
 
 func main() {
-	log.SetFlags(0)
-
 	// To reduce log spam, we'll just put this here, not using any framework.
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 
+	// Setup connections to the databases.
 	udb := userDb{{"bob", "Bob", "bob@example.com"}, {"alice", "Alice", "alice@example.com"}}
 
 	// Create a typical sandwich middleware with logging and error-handling.
@@ -51,35 +39,32 @@ func main() {
 	authed := mw.With(FailIfNotAuthenticated)
 	http.Handle("/user/profile", authed.With(ShowUserProfile))
 
-	// Comparison to the auto-generated profile page.
-	http.HandleFunc("/user/profile/gen", Generated_ShowUserProfile(udb))
-	// Comparison to the auto-generated landing page.
-	http.HandleFunc("/gen", Generated_ShowLandingPage(udb))
-	// Comparison to a hand-coded landing page.
-	http.HandleFunc("/hand", func(w http.ResponseWriter, r *http.Request) {
-		w, rw := sandwich.WrapResponseWriter(w)
-		e := sandwich.StartLog(r)
-		defer e.Commit(rw)
-		u, err := ParseUserIfLoggedIn(r, udb, e)
-		if err != nil {
-			sandwich.HandleError(w, r, e, err)
-			return
-		}
-		ShowLandingPage(w, u)
-	})
-
 	log.Println("Serving on :8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatal("Can't start webserver:", err)
 	}
 }
 
+// The actual user DB implementation.
+type userDb []User
+
+func (udb userDb) Lookup(id string) (User, error) {
+	for _, u := range udb {
+		if id == u.Id {
+			return u, nil
+		}
+	}
+	return User{}, fmt.Errorf("no such user %q", id)
+}
+
 func ShowLandingPage(w http.ResponseWriter, u *User) {
-	fmt.Fprintln(w, "<html><body>")
+	fmt.Fprintln(w, "<html><body style='font-family:sans-serif'>")
 	if u == nil {
 		fmt.Fprint(w, "Hello unknown person!")
+		fmt.Fprintf(w, "  [<a href='/user/profile'>profile</a> will fail and log an error]")
 	} else {
 		fmt.Fprintf(w, "Welcome back, %s!", u.Name)
+		fmt.Fprintf(w, "  [<a href='/user/profile'>profile</a>]")
 	}
 	fmt.Fprintln(w, `<p><hr>
         Login<br>
@@ -88,10 +73,11 @@ func ShowLandingPage(w http.ResponseWriter, u *User) {
             <input type='submit'>
         </form>
         <hr>
-        Compare handler times in the log:
-        <a href="/">Sandwich-based home page</a> |
-        <a href="/gen">Auto-generated home page</a> |
-        <a href="/hand">Hand-coded home page</a>
+        Try logging in with: <ul>
+        	<li> "alice" will authenticate to Alice
+        	<li> "bob" will authenticate to Bob but panic during request handling
+        	<li> any other string for a non-authenticated user.
+        </ul>
     `)
 }
 
