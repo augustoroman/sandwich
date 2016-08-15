@@ -22,7 +22,19 @@ type Error struct {
 }
 
 func (e Error) Error() string {
-	return fmt.Sprintf("[%d] %s: %v", e.Code, e.LogMsg, e.Cause)
+	msg := fmt.Sprintf("(%d) %s", e.Code, e.LogMsg)
+	if e.Cause != nil {
+		msg += ": " + e.Cause.Error()
+	}
+	return msg
+}
+
+// LogIfMsg will set the Error field on the LogEntry if the Error's LogMsg
+// field has something.
+func (e Error) LogIfMsg(l *LogEntry) {
+	if e.LogMsg != "" {
+		l.Error = e
+	}
 }
 
 // Done is a sentinel error value that can be used to interrupt the middleware
@@ -31,7 +43,11 @@ func (e Error) Error() string {
 // to the log.
 var Done = errors.New("<done>")
 
-func handleErrorCommon(w http.ResponseWriter, r *http.Request, l *LogEntry, err error) Error {
+// ToError will convert a generic non-nil error to an explicit sandwich.Error
+// type.  If err is already a sandwich.Error, it will be returned.  Otherwise, a
+// generic 500 Error (internal server error) will be initialized and returned.
+// Note that if err is nil, it will still return a generic 500 Error.
+func ToError(err error) Error {
 	e, ok := err.(Error)
 	if !ok {
 		e = Error{LogMsg: "Failure", Cause: err}
@@ -39,16 +55,8 @@ func handleErrorCommon(w http.ResponseWriter, r *http.Request, l *LogEntry, err 
 	if e.Code == 0 {
 		e.Code = 500
 	}
-
 	if e.ClientMsg == "" {
 		e.ClientMsg = http.StatusText(e.Code)
-	}
-	if e.LogMsg != "" {
-		msg := fmt.Sprintf("(%d) %s", e.Code, e.LogMsg)
-		if e.Cause != nil {
-			msg += ": " + e.Cause.Error()
-		}
-		l.Error = errors.New(msg)
 	}
 	return e
 }
@@ -63,7 +71,8 @@ func HandleError(w http.ResponseWriter, r *http.Request, l *LogEntry, err error)
 	if err == Done {
 		return
 	}
-	e := handleErrorCommon(w, r, l, err)
+	e := ToError(err)
+	e.LogIfMsg(l)
 	http.Error(w, e.ClientMsg, e.Code)
 }
 
@@ -76,7 +85,9 @@ func HandleErrorJson(w http.ResponseWriter, r *http.Request, l *LogEntry, err er
 	if err == Done {
 		return
 	}
-	e := handleErrorCommon(w, r, l, err)
+	e := ToError(err)
+	e.LogIfMsg(l)
 	w.Header().Set("Content-Type", "application/json")
-	http.Error(w, fmt.Sprintf(`{"error":%q}`, e.ClientMsg), e.Code)
+	w.WriteHeader(e.Code)
+	fmt.Fprintf(w, `{"error":%q}`, e.ClientMsg)
 }
