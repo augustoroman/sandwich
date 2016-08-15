@@ -30,14 +30,18 @@ func main() {
 		// If so, we'll add a note to the log entries.
 		With(ParseUserIfLoggedIn)
 
-	// If the user is logged in, they'll get a personalized landing page.  Otherwise,
-	// they'll get a generic landing page.
+	// If the user is logged in, they'll get a personalized landing page.
+	// Otherwise, they'll get a generic landing page.
 	http.Handle("/", mw.With(ShowLandingPage))
 	http.Handle("/login", mw.With(Login))
 
 	// Some pages are only allowed if the user is logged in.
-	authed := mw.With(FailIfNotAuthenticated)
-	http.Handle("/user/profile", authed.With(ShowUserProfile))
+	http.Handle("/user/profile", mw.With(FailIfNotAuthenticated, ShowUserProfile))
+	// If you have multiple pages that require authentication, you could do:
+	//   authed := mw.With(FailIfNotAuthenticated)
+	//   http.Handle("/user/profile", authed.With(ShowUserProfile))
+	//   http.Handle("/user/...", authed.With(...))
+	//   http.Handle("/user/...", authed.With(...))
 
 	log.Println("Serving on :8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
@@ -103,7 +107,7 @@ func Login(w http.ResponseWriter, r *http.Request, udb UserDb, e *sandwich.LogEn
 	e.Note["userId"] = u.Id
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth",
-		Value:    u.Id,
+		Value:    u.Id, // Encrypt cookie here, maybe include the whole user struct.
 		Expires:  time.Now().Add(time.Hour),
 		MaxAge:   int(time.Hour / time.Second),
 		HttpOnly: true,
@@ -127,7 +131,7 @@ func getAndParseCookie(r *http.Request) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	userid := c.Value // decrypt cookie here, maybe getting a whole user struct.
+	userid := c.Value // Decrypt cookie here, maybe getting a whole user struct.
 	return userid, nil
 }
 
