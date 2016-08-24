@@ -10,11 +10,11 @@ import (
 // New constructs a clean Middleware instance, ready for you to start piling on
 // the handlers.
 func New() Middleware {
-	return Middleware{
+	return Middleware(
 		chain.Chain{}.
 			Reserve((*http.ResponseWriter)(nil)).
 			Reserve((*http.Request)(nil)),
-	}
+	)
 }
 
 // TheUsual constructs a popular new Middleware instance with some delicious
@@ -30,14 +30,16 @@ func TheUsual() Middleware {
 // Middleware is the stack of middleware functions that pwoers sandwich's
 // deliciousness.  It implements http.ServeHTTP and is immutable: all mutating
 // functions create a new instance.
-type Middleware struct{ c chain.Chain }
+type Middleware chain.Chain
+
+func (m Middleware) chain() chain.Chain { return chain.Chain(m) }
 
 // Provide makes the specified value available as an input parameter to
 // subsequent handlers.  If the same type has already been provided (either by
 // previous Provide(...) calls or as the return value of a handler), the old
 // value will be replaced by the newly provided value.
 func (m Middleware) Provide(val interface{}) Middleware {
-	return Middleware{m.c.Provide(val)}
+	return Middleware(m.chain().Provide(val))
 }
 
 // ProvideAs makes the specified value available under the interface type
@@ -47,7 +49,7 @@ func (m Middleware) Provide(val interface{}) Middleware {
 //
 //   m.ProvideAs(myConcreteImpl, (*someInterface)(nil))
 func (m Middleware) ProvideAs(val, ifacePtr interface{}) Middleware {
-	return Middleware{m.c.ProvideAs(val, ifacePtr)}
+	return Middleware(m.chain().ProvideAs(val, ifacePtr))
 }
 
 // With adds one or more middleware handles to the stack.  Middleware handlers
@@ -55,7 +57,7 @@ func (m Middleware) ProvideAs(val, ifacePtr interface{}) Middleware {
 // Provide(...) or from the return values of previous handlers in the entire
 // middleware stack.
 func (m Middleware) With(handlers ...interface{}) Middleware {
-	return Middleware{m.c.With(handlers...)}
+	return Middleware(m.chain().With(handlers...))
 }
 
 // OnErr adds a new error handler to the middleware stack.  The error handler
@@ -63,7 +65,7 @@ func (m Middleware) With(handlers ...interface{}) Middleware {
 // affect any handlers previously added to the middleware stack.  Error handlers
 // may not return any values.
 func (m Middleware) OnErr(handler interface{}) Middleware {
-	return Middleware{m.c.OnErr(handler)}
+	return Middleware(m.chain().OnErr(handler))
 }
 
 // Wrap adds two handlers: one that is called during the normal middleware
@@ -75,18 +77,18 @@ func (m Middleware) OnErr(handler interface{}) Middleware {
 // 'before' returns an error), 'after' will not be called.  The 'before' handler
 // may be nil in which case only the after handler will be registered.
 func (m Middleware) Wrap(before, after interface{}) Middleware {
-	c := m.c
+	c := m.chain()
 	if before != nil {
 		c = c.With(before)
 	}
 	c = c.Defer(after)
-	return Middleware{c}
+	return Middleware(c)
 }
 
 // ServerHTTP implements the http.Handler interface and provides the initial
 // http.ResponseWriter and *http.Request to the middleware chain.
 func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := m.c.Run((*http.ResponseWriter)(&w), r); err != nil {
+	if err := m.chain().Run((*http.ResponseWriter)(&w), r); err != nil {
 		panic(err) // This should never happen.
 	}
 }
@@ -107,6 +109,6 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 //   }
 func (m Middleware) Code(pkg, funcName string) string {
 	var buf bytes.Buffer
-	m.c.Code(funcName, pkg, &buf)
+	m.chain().Code(funcName, pkg, &buf)
 	return buf.String()
 }
