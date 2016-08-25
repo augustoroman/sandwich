@@ -263,8 +263,8 @@ execution:
 	}
 
 	// Finally, call any deferred functions that we've gotten to.
-	for _, step := range postSteps {
-		c.call(step, data, &stack)
+	for i := len(postSteps) - 1; i >= 0; i-- {
+		c.call(postSteps[i], data, &stack)
 	}
 
 	return nil
