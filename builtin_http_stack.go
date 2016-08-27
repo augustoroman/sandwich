@@ -2,9 +2,9 @@ package sandwich
 
 import (
 	"bytes"
-	"github.com/augustoroman/sandwich/chain"
-
 	"net/http"
+
+	"github.com/augustoroman/sandwich/chain"
 )
 
 // New constructs a clean Middleware instance, ready for you to start piling on

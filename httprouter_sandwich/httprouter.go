@@ -3,11 +3,11 @@
 package httprouter_sandwich
 
 import (
+	"net/http"
+
 	"github.com/augustoroman/sandwich"
 	"github.com/augustoroman/sandwich/chain"
 	"github.com/julienschmidt/httprouter"
-
-	"net/http"
 )
 
 func Adapt(mw sandwich.Middleware) sandwich.Middleware {

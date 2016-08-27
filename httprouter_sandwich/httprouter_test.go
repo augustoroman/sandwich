@@ -2,10 +2,11 @@ package httprouter_sandwich
 
 import (
 	"fmt"
-	"github.com/julienschmidt/httprouter"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/julienschmidt/httprouter"
 )
 
 func TestParamsRouting(t *testing.T) {

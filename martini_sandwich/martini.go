@@ -3,11 +3,11 @@
 package martini_sandwich
 
 import (
+	"net/http"
+
 	"github.com/augustoroman/sandwich"
 	"github.com/augustoroman/sandwich/chain"
 	"github.com/go-martini/martini"
-
-	"net/http"
 )
 
 func Adapt(mw sandwich.Middleware) sandwich.Middleware {
