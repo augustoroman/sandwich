@@ -16,7 +16,9 @@ import (
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 
 // DefaultErrorHandler is called when an error in the chain occurs and no error
-// handler has been registered.
+// handler has been registered.  Warning!  The default error handler is not
+// checked to verify that it's arguments can be provided.  It's STRONGLY
+// recommended to keep this as absolutely simple as possible.
 var DefaultErrorHandler interface{} = func(err error) {
 	log.Printf("Unhandled error: %v", err)
 }
@@ -158,7 +160,9 @@ func (c Chain) OnErr(errorHandler interface{}) Chain {
 
 // Defer adds a deferred handler to be executed after all normal handlers and
 // error handlers have been called.  Deferred handlers are executed in reverse
-// order that they were registered (most recent first).
+// order that they were registered (most recent first).  Deferred handlers can
+// accept the error type even if it hasn't been explicitly provided yet.  If no
+// error has occurred, it will be nil.
 func (c Chain) Defer(handler interface{}) Chain {
 	fn, err := valueOfFunction(handler)
 	if err != nil {
@@ -182,7 +186,11 @@ func (c Chain) Defer(handler interface{}) Chain {
 func (c Chain) Run(reservedValues ...interface{}) error {
 	data := map[reflect.Type]reflect.Value{}
 	postSteps := []step{} // collect post steps here
-	errHandler := step{tERROR_HANDLER, reflect.ValueOf(DefaultErrorHandler), nil}
+	errHandler := step{   // Initialize using the default error handler.
+		tERROR_HANDLER,
+		reflect.ValueOf(DefaultErrorHandler),
+		reflect.TypeOf(DefaultErrorHandler),
+	}
 	stack := []step{}
 
 	// 1: Apply all of the reserved values.  Make sure that the reserved values
@@ -260,6 +268,8 @@ execution:
 	// Execute the error handler if there is any error.
 	if errorVal := data[errorType]; errorVal.IsValid() && !errorVal.IsNil() {
 		c.call(errHandler, data, &stack)
+	} else {
+		data[errorType] = reflect.Zero(errorType)
 	}
 
 	// Finally, call any deferred functions that we've gotten to.
