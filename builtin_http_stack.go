@@ -27,7 +27,7 @@ func TheUsual() Middleware {
 		OnErr(HandleError)
 }
 
-// Middleware is the stack of middleware functions that pwoers sandwich's
+// Middleware is the stack of middleware functions that powers sandwich's
 // deliciousness.  It implements http.ServeHTTP and is immutable: all mutating
 // functions create a new instance.
 type Middleware chain.Chain

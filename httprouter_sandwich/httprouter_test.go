@@ -1,4 +1,4 @@
-package httprouter_sandwich
+package httprouter_sandwich_test
 
 import (
 	"fmt"
@@ -6,35 +6,28 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/augustoroman/sandwich/httprouter_sandwich"
 	"github.com/julienschmidt/httprouter"
 )
 
 func TestParamsRouting(t *testing.T) {
-	r := httprouter.New()
-	printParam := func(w http.ResponseWriter, key string, p httprouter.Params) {
-		for _, param := range p {
-			if param.Key == key {
-				fmt.Fprintf(w, "%s = %s", key, param.Value)
-				return
-			}
-		}
-		http.Error(w, "Param "+key+" not found", http.StatusNotFound)
+	// An example function using the httprouter.Params as an input.
+	greet := func(w http.ResponseWriter, p httprouter.Params) {
+		fmt.Fprintf(w, "%s %s", p[0].Value, p[1].Value)
 	}
-	mw := New()
-	r.GET("/foo/:arg", mw.Provide("arg").With(printParam).ServeHTTP)
-	r.GET("/bar/:baz", mw.Provide("baz").With(printParam).ServeHTTP)
 
+	// An example server using the martini_sandwich adapter.
+	s := httprouter_sandwich.TheUsual()
+	r := httprouter.New()
+	r.GET("/say/:greeting/:name", s.With(greet).H)
+
+	// Call the server.
 	rw := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/foo/asdf", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	req, _ := http.NewRequest("GET", "/say/Hi/Bob", nil)
 	r.ServeHTTP(rw, req)
 
-	if rw.Code != 200 {
-		t.Errorf("Bad response code: %v", rw.Code)
-	}
-	if rw.Body.String() != "arg = asdf" {
-		t.Errorf("Wrong arg value: %q (expected 'asdf')", rw.Body.String())
+	// Validate the output.
+	if rw.Body.String() != "Hi Bob" {
+		t.Errorf("Wrong response: %q", rw.Body.String())
 	}
 }

@@ -6,7 +6,7 @@
 
 ## Features
 
-* Keeps middleware simple and testable.
+* Keeps middleware and handlers simple and testable.
 * Consolidates error handling.
 * Ensures that middleware dependencies are safely provided -- avoids unsafe casting from generic context objects.
 * Detects missing dependencies during route initialization.
