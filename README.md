@@ -1,6 +1,6 @@
 <img align="right" height=400 src="http://s3.amazonaws.com/foodspotting-ec2/reviews/3957590/thumb_600.jpg?1377120135" />
 
-# Sandwich: Delicious HTTP Middleware [![GoDoc](https://godoc.org/github.com/augustoroman/sandwich?status.png)](http://godoc.org/github.com/augustoroman/sandwich)
+# Sandwich: Delicious HTTP Middleware  [![Build Status](https://travis-ci.org/augustroman/sandwich.svg?branch=master)](https://travis-ci.org/augustroman/sandwich)  [![Go Report Card](https://goreportcard.com/badge/github.com/augustoroman/sandwich)](https://goreportcard.com/report/github.com/augustoroman/sandwich)  [![GoDoc](https://godoc.org/github.com/augustoroman/sandwich?status.png)](http://godoc.org/github.com/augustoroman/sandwich)
 
 *Keep pilin' it on!*
 
