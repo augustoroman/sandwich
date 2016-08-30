@@ -4,3 +4,6 @@ go:
   - 1.6
   - 1.7
   - tip
+notifications:
+  email:
+    on_failure: change
