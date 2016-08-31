@@ -4,12 +4,36 @@
 
 *Keep pilin' it on!*
 
+Sandwich is a middleware framework that lets you write your handlers and
+middleware the way you want to and it takes care of tracking & validating
+dependencies.  Use any router you like!  You can write handlers like this:
+
+```go
+func GetUserApi(w http.ResponseWriter, udb UserDb, id UserId) error {
+	if user, err := udb.Lookup(id); err == userdb.ErrNotFound {
+		return sandwich.Error{
+			Code: http.StatusNotFound,
+			ClientMsg: "No such user",
+			Cause: err,
+		}
+	} else if err != nil {
+		return err
+	} else {
+		return json.NewEncoder(w).Encode(user)
+	}
+}
+```
+
+
+Sandwich will validate that the arguments to your function having been provided
+by the middleware chain and will call your handlers in order.
+
 ## Features
 
 * Keeps middleware and handlers simple and testable.
 * Consolidates error handling.
 * Ensures that middleware dependencies are safely provided -- avoids unsafe casting from generic context objects.
-* Detects missing dependencies during route initialization.
+* Detects missing dependencies during route construction (before the server starts listening!), not when the route is actually called.
 * Provides clear and helpful error messages.
 * Provides just a touch of magic: enough to make things easier, but not enough to induce a debugging nightmare.
 
@@ -18,26 +42,26 @@
 Here's a very simple example of using sandwich with the standard HTTP stack:
 
 ```go
-   package main
+package main
 
-   import (
-       "fmt"
-       "log"
-       "net/http"
-       "github.com/augustoroman/sandwich"
-   )
+import (
+	"fmt"
+	"log"
+	"net/http"
+	"github.com/augustoroman/sandwich"
+)
 
-   func main() {
-       // Create a default sandwich middlware stack that includes logging and
-       // a simple error handler.
-       s := sandwich.TheUsual()
-       http.Handle("/", s.With(func(w http.ResponseWriter) {
-           fmt.Fprintf(w, "Hello world!")
-       }))
-       if err := http.ListenAndServe(":6060", nil); err != nil {
-           log.Fatal(err)
-       }
-   }
+func main() {
+	// Create a default sandwich middlware stack that includes logging and
+	// a simple error handler.
+	s := sandwich.TheUsual()
+	http.Handle("/", s.With(func(w http.ResponseWriter) {
+		fmt.Fprintf(w, "Hello world!")
+	}))
+	if err := http.ListenAndServe(":6060", nil); err != nil {
+		log.Fatal(err)
+	}
+}
 ```
 
 For more examples, see the examples directory.
@@ -62,15 +86,15 @@ previous middleware or directly during the initial setup.
 For example, you can use this to provide your database to all handlers:
 
 ```go
-  func main() {
-      db_conn := ConnectToDatabase(...)
-      s := sandwich.TheUsual().Provide(db_conn)
-      http.Handle("/", s.With(home))
-  }
+func main() {
+    db_conn := ConnectToDatabase(...)
+    s := sandwich.TheUsual().Provide(db_conn)
+    http.Handle("/", s.With(home))
+}
 
-  func Home(w http.ResponseWriter, r *http.Request, db_conn *Database) {
-      // process the request here, using the provided db_conn
-  }
+func Home(w http.ResponseWriter, r *http.Request, db_conn *Database) {
+    // process the request here, using the provided db_conn
+}
 ```
 
 Provide(...) and ProvideAs(...) are excellent alternatives to using global
@@ -83,16 +107,16 @@ In many cases you want to initialize a value based on the request, for
 example extracting the user login:
 
 ```go
-  func main() {
-      s := sandwich.TheUsual().With(ParseUserCookie)
-      http.Handle("/", s.With(SayHi))
-  }
-  // You can write & test exactly this signature:
-  func ParseUserCookie(r *http.Request) (User, error) { ... }
-  // Then write your handler assuming User is available:
-  func SayHi(w http.ResponseWriter, u User) {
-      fmt.Fprintf(w, "Hello %s", u.Name)
-  }
+func main() {
+    s := sandwich.TheUsual().With(ParseUserCookie)
+    http.Handle("/", s.With(SayHi))
+}
+// You can write & test exactly this signature:
+func ParseUserCookie(r *http.Request) (User, error) { ... }
+// Then write your handler assuming User is available:
+func SayHi(w http.ResponseWriter, u User) {
+    fmt.Fprintf(w, "Hello %s", u.Name)
+}
 ```
 
 This starts to show off the real power of sandwich.  For each request, the
@@ -122,26 +146,26 @@ values.
 Here's an example of rendering errors with a custom error page:
 
 ```go
-  type ErrorPageTemplate *template.Template
-  func main() {
-      tpl := template.Must(template.ParseFiles("path/to/my/error_page.tpl"))
-      s := sandwich.TheUsual().
-          Provide(ErrorPageTemplate(tpl)).
-          OnErr(MyErrorHandler)
-      ...
-  }
-  func MyErrorHandler(w http.ResponseWriter, t ErrorPageTemplate, l *sandwich.LogEntry, err error) {
-      if err == sandwich.Done {  // sandwich.Done can be returned to abort middleware.
-          return                 // It indicates there was no actual error, so just return.
-      }
-      // Unwrap to a sandwich.Error that has Code, ClientMsg, and internal LogMsg.
-      e := sandwich.ToError(err)
-      // If there's an internal log message, add it to the request log.
-      e.LogIfMsg(l)
-      // Respond with my custom html error page, including the client-facing msg.
-      w.WriteHeader(e.Code)
-      t.Execute(w, map[string]string{Msg: e.ClientMsg})
-  }
+type ErrorPageTemplate *template.Template
+func main() {
+    tpl := template.Must(template.ParseFiles("path/to/my/error_page.tpl"))
+    s := sandwich.TheUsual().
+        Provide(ErrorPageTemplate(tpl)).
+        OnErr(MyErrorHandler)
+    ...
+}
+func MyErrorHandler(w http.ResponseWriter, t ErrorPageTemplate, l *sandwich.LogEntry, err error) {
+    if err == sandwich.Done {  // sandwich.Done can be returned to abort middleware.
+        return                 // It indicates there was no actual error, so just return.
+    }
+    // Unwrap to a sandwich.Error that has Code, ClientMsg, and internal LogMsg.
+    e := sandwich.ToError(err)
+    // If there's an internal log message, add it to the request log.
+    e.LogIfMsg(l)
+    // Respond with my custom html error page, including the client-facing msg.
+    w.WriteHeader(e.Code)
+    t.Execute(w, map[string]string{Msg: e.ClientMsg})
+}
 ```
 
 Error handlers allow you consolidate the error handling of your web app.  You
@@ -165,24 +189,24 @@ state to pass to the deferred handler.  For example, the logging handlers
 are:
 
 ```go
-  // StartLog creates a *LogEntry and initializes it with basic request
-  // information.
-  func StartLog(r *http.Request) *LogEntry {
+// StartLog creates a *LogEntry and initializes it with basic request
+// information.
+func StartLog(r *http.Request) *LogEntry {
     return &LogEntry{Start: time.Now(), ...}
-  }
+}
 
-  // Commit fills in the remaining *LogEntry fields and writes the entry out.
-  func (entry *LogEntry) Commit(w *ResponseWriter) {
+// Commit fills in the remaining *LogEntry fields and writes the entry out.
+func (entry *LogEntry) Commit(w *ResponseWriter) {
     entry.Elapsed = time.Since(entry.Start)
     ...
     WriteLog(*entry)
-  }
+}
 ```
 
 and are added to the chain using:
 
 ```go
-    Wrap(StartLog, (*LogEntry).Commit)
+Wrap(StartLog, (*LogEntry).Commit)
 ```
 
 In this case, `StartLog` returns a `*LogEntry` that is then provided to downstream
@@ -201,32 +225,32 @@ This means that if you have an interface and a concrete implementation, such
 as:
 
 ```go
-  type UserDatabase interface{
-      GetUserProfile(u User) (Profile, error)
-  }
-  type userDbImpl struct { ... }
-  func (u *userDbImpl) GetUserProfile(u User) (Profile, error) { ... }
+type UserDatabase interface{
+    GetUserProfile(u User) (Profile, error)
+}
+type userDbImpl struct { ... }
+func (u *userDbImpl) GetUserProfile(u User) (Profile, error) { ... }
 ```
 
 You cannot provide this to handlers directly via the Provide() call.
 
 ```go
-  udb := &userDbImpl{...}
-  // DOESN'T WORK: this will provide *userDbImpl, not UserDatabase
-  s.Provide(udb)
-  s.Provide((UserDatabase)(udb)) // DOESN'T WORK EITHER
-  udb_iface := UserDatabase(udb)
-  s.Provide(&udb_iface)          // STILL DOESN'T WORK!
+udb := &userDbImpl{...}
+// DOESN'T WORK: this will provide *userDbImpl, not UserDatabase
+s.Provide(udb)
+s.Provide((UserDatabase)(udb)) // DOESN'T WORK EITHER
+udb_iface := UserDatabase(udb)
+s.Provide(&udb_iface)          // STILL DOESN'T WORK!
 ```
 
 Instead, you have to either use ProvideAs() or With():
 
 ```go
-  udb := &userDbImpl{...}
-  // either use ProvideAs() with a pointer to the interface
-  s.ProvideAs(udb, (*UserDatabase)(nil))
-  // or add a handler that returns the interface
-  s.With(func() UserDatabase { return udb })
+udb := &userDbImpl{...}
+// either use ProvideAs() with a pointer to the interface
+s.ProvideAs(udb, (*UserDatabase)(nil))
+// or add a handler that returns the interface
+s.With(func() UserDatabase { return udb })
 ```
 
 It's a bit silly, but there you are.
