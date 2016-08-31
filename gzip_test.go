@@ -11,9 +11,6 @@ import (
 
 func TestGzip(t *testing.T) {
 	greet := func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get(headerAcceptEncoding) != "gzip" {
-			t.Error("Expected gzip to be accepted: ", r.Header)
-		}
 		fmt.Fprintf(w, "Hi there!")
 	}
 	handler := Gzip(New()).With(greet)
@@ -40,5 +37,16 @@ func TestGzip(t *testing.T) {
 		t.Fatal(err)
 	} else if string(body) != "Hi there!" {
 		t.Errorf("Wrong response: %q", string(body))
+	}
+
+	// Also, test without the accept header and make sure it's NOT gzip'd.
+	resp = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/", nil)
+	handler.ServeHTTP(resp, req)
+	if resp.Header().Get(headerContentEncoding) == "gzip" {
+		t.Errorf("Unexpectedly gzip'd: Content-encoding: %q", resp.Header())
+	}
+	if resp.Body.String() != "Hi there!" {
+		t.Errorf("Wrong response: %q", resp.Body.String())
 	}
 }
