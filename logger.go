@@ -2,6 +2,7 @@ package sandwich
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"sort"
@@ -11,6 +12,7 @@ import (
 
 // Injected for testing
 var time_Now = time.Now
+var os_Stderr io.Writer = os.Stderr
 
 // LogEntry is the information tracked on a per-request basis for the sandwich
 // Logger.  All fields other than Note are automatically filled in.  The Note
@@ -57,15 +59,21 @@ func (entry *LogEntry) Commit(w *ResponseWriter) {
 	WriteLog(*entry)
 }
 
+// Some nice escape codes
+const (
+	_GREEN  = "\033[32m"
+	_YELLOW = "\033[33m"
+	_RESET  = "\033[0m"
+	_RED    = "\033[91m"
+)
+
 // WriteLog is called to actually write a LogEntry out to the log. By default,
-// it writes to stderr and colors errors red, however you can replace the
-// function to adjust the formatting or whatever logging library you like.
+// it writes to stderr and colors normal requests green, slow requests yellow,
+// and errors red.  You can replace the function to adjust the formatting or use
+// whatever logging library you like.
 var WriteLog = func(e LogEntry) {
-	col, reset := "", ""
-	if e.StatusCode >= 400 || e.Error != nil {
-		col, reset = "\033[91m", "\033[0m" // high-intensity red + reset
-	}
-	fmt.Fprintf(os.Stderr, "%s%s %s \"%s %s\" (%d %dB %s) %s%s\n",
+	col, reset := e.colors()
+	fmt.Fprintf(os_Stderr, "%s%s %s \"%s %s\" (%d %dB %s) %s%s\n",
 		col,
 		e.Start.Format(time.RFC3339), e.RemoteIp,
 		e.Request.Method, e.Request.URL.Path,
@@ -86,6 +94,17 @@ func (l LogEntry) NotesAndError() string {
 		msg += "\n  ERROR: " + l.Error.Error()
 	}
 	return msg
+}
+
+func (e LogEntry) colors() (start, reset string) {
+	col, reset := _GREEN, _RESET
+	if e.Elapsed > 30*time.Millisecond {
+		col = _YELLOW
+	}
+	if e.StatusCode >= 400 || e.Error != nil {
+		col, reset = _RED, _RESET // high-intensity red + reset
+	}
+	return col, reset
 }
 
 // remoteIp extracts the remote IP from the request.  Adapted from code in
