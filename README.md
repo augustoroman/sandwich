@@ -272,7 +272,7 @@ For those of you familiar with martini, sandwich has a lot of similarities but i
 
 On the other hand, sandwich DOES:
 
-* ...explicitly ensure that dependencies must be provided by enforcing that inputs to middleware are provided as return values of previous middleware.  Failures occur at route creation rather than during an HTTP call.
+* ...explicitly ensure that dependencies must be provided by enforcing that inputs to middleware are provided as return values of previous middleware.  Failures occur at route creation rather than during an HTTP request.
 
 * ...special-case error return values and provide explicit, consolidated error handling in the middleware chain.
 
@@ -298,14 +298,22 @@ While it's true that you can't get the same compile-time checking that you do wi
 
 At the time each middleware function is added to the stack, the library ensures that it's dependencies have been explicitly provided.  One of the *features* of sandwich is that you can't arbitrary inject values -- they need to have an explicit provisioning source.
 
-**Q: Doesn't the http.Request.Context in go 1.7 solve this?**
+**Q: Doesn't the http.Request.Context in go 1.7 solve the middleware dependency problem?**
 
 Have a request-scoped context allows you to pass values between middleware handlers, it's true.  However, there's no guarantee that the values are available, so you get the same run-time bugs that you might get with a naive dependency-injection framework.  In addition, you have to do type-assertions to get your values, so there's another possible source of bugs.  One of the goals of sandwich is to avoid these two types of bugs.
 
+**Q: Why do I have to use _two_ functions (before & after) to wrap a request.  Why can't I just have one with a next() function?**
+
+Many middleware frameworks provide the capability to wrap a request via a next() function.  Sometimes it's part of a context object ([martini's Context.Next()](https://godoc.org/github.com/go-martini/martini#Context), [gin's Context.Next()](https://godoc.org/github.com/gin-gonic/gin#Context.Next)) and sometimes it's directly provided ([negroni's third handler arg](https://godoc.org/github.com/urfave/negroni#HandlerFunc)).
+
+While implementing sandwich, I initially included a next() function until I realized it was impossible to validate the dependencies with such a function.  Sandwich guarantees that dependencies can be supplied, and therefore next() had to go.
+
+Instead, I took a tip from go and instead implemented [defer](https://godoc.org/github.com/augustoroman/sandwich/chain#Chain.Defer).  The wrap interface simply makes it obvious that there's a before and after.  This allows me to keep my dependency guarantee.
+
 **Q: I like my hand-coded handlers, they are super fast!**
 
-Guess what?! Because of the structure that sandwich imposes on constructing middleware chains, it can generate a pure Go middleware function (with no reflection or depedency injection) to replace the sandwich calls!  So for those ultra time-sensitive functions, you can replace them with fast, generated code and still reap the benefits of using sandwich!
+Guess what?! Because of the structure that sandwich imposes on constructing middleware chains, it can actually [generate an idiomatic Go middleware function](https://godoc.org/github.com/augustoroman/sandwich#Middleware.Code) (with no reflection or depedency injection) to replace the sandwich calls!  So for those ultra time-sensitive functions, you can replace them with fast, generated code and still reap the benefits of using sandwich with your handlers!
 
 **Q: I don't know, it's still scary and terrible!**
 
-I hope you don't get scared off by all this talk.  Take a look at the library, try it out, and I hope you enjoy it. If you don't, there are lots of great alternatives.
+Don't get scared off. Take a look at the library, try it out, and I hope you enjoy it. If you don't, there are lots of great alternatives.
