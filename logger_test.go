@@ -65,6 +65,7 @@ func TestLogger(t *testing.T) {
 	fail := func() error { return errors.New("It went horribly wrong") }
 	slowFail := func() error { clk.Sleep(time.Second); return fail() }
 	panics := func(w http.ResponseWriter) { sendMsg(w); panic("oops") }
+	addsNote := func(w http.ResponseWriter, e *LogEntry) { e.Note["a"] = "x"; e.Note["b"] = "y"; sendMsg(w) }
 
 	var resp *httptest.ResponseRecorder
 	var req *http.Request
@@ -74,9 +75,9 @@ func TestLogger(t *testing.T) {
 	resp = httptest.NewRecorder()
 	req, _ = http.NewRequest("GET", "/", nil)
 	req.Header.Add("X-Real-IP", "123.456.789.0")
-	TheUsual().With(sendMsg).ServeHTTP(resp, req)
+	TheUsual().With(addsNote).ServeHTTP(resp, req)
 	validateLogMessage(t, logBuf.String(), _GREEN,
-		`2001-02-03T04:05:06Z 123.456.789.0 "GET /" (200 8B 13ms)`)
+		`2001-02-03T04:05:06Z 123.456.789.0 "GET /" (200 8B 13ms)   a="x" b="y"`)
 
 	// Test a slow response:
 	logBuf.Reset()
