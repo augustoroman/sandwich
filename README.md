@@ -1,40 +1,21 @@
 <img align="right" height=400 src="http://s3.amazonaws.com/foodspotting-ec2/reviews/3957590/thumb_600.jpg?1377120135" />
 
-# Sandwich: Delicious HTTP Middleware  [![Build Status](https://travis-ci.org/augustoroman/sandwich.svg?branch=master)](https://travis-ci.org/augustoroman/sandwich)  [![Go Report Card](https://goreportcard.com/badge/github.com/augustoroman/sandwich)](https://goreportcard.com/report/github.com/augustoroman/sandwich)  [![GoDoc](https://godoc.org/github.com/augustoroman/sandwich?status.png)](http://godoc.org/github.com/augustoroman/sandwich)
+# Sandwich: Delicious HTTP Middleware  [![Build Status](https://travis-ci.org/augustoroman/sandwich.svg?branch=master)](https://travis-ci.org/augustoroman/sandwich)  [![Coverage](https://gocover.io/_badge/github.com/augustoroman/sandwich?1)](https://gocover.io/github.com/augustoroman/sandwich)  [![Go Report Card](https://goreportcard.com/badge/github.com/augustoroman/sandwich)](https://goreportcard.com/report/github.com/augustoroman/sandwich)  [![GoDoc](https://godoc.org/github.com/augustoroman/sandwich?status.png)](http://godoc.org/github.com/augustoroman/sandwich)
 
 *Keep pilin' it on!*
 
 Sandwich is a middleware framework that lets you write your handlers and
 middleware the way you want to and it takes care of tracking & validating
-dependencies.  Use any router you like!  You can write handlers like this:
-
-```go
-func GetUserApi(w http.ResponseWriter, udb UserDb, id UserId) error {
-	if user, err := udb.Lookup(id); err == userdb.ErrNotFound {
-		return sandwich.Error{
-			Code: http.StatusNotFound,
-			ClientMsg: "No such user",
-			Cause: err,
-		}
-	} else if err != nil {
-		return err
-	} else {
-		return json.NewEncoder(w).Encode(user)
-	}
-}
-```
-
-
-Sandwich will validate that the arguments to your function having been provided
-by the middleware chain and will call your handlers in order.
+dependencies.  Use any router you like!
 
 ## Features
 
 * Keeps middleware and handlers simple and testable.
 * Consolidates error handling.
 * Ensures that middleware dependencies are safely provided -- avoids unsafe casting from generic context objects.
-* Detects missing dependencies during route construction (before the server starts listening!), not when the route is actually called.
+* Detects missing dependencies *during route construction* (before the server starts listening!), not when the route is actually called.
 * Provides clear and helpful error messages.
+* Compatible with the [http.Handler](https://godoc.org/net/http#Handler) interface and lots of existing middleware.
 * Provides just a touch of magic: enough to make things easier, but not enough to induce a debugging nightmare.
 
 ## Getting started
