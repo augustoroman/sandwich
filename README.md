@@ -17,6 +17,7 @@ dependencies.  Use any router you like!
 * Provides clear and helpful error messages.
 * Compatible with the [http.Handler](https://godoc.org/net/http#Handler) interface and lots of existing middleware.
 * Provides just a touch of magic: enough to make things easier, but not enough to induce a debugging nightmare.
+* When extreme performance is necessary, sandwich can generate [reflection-free, non-magical idiomatic go code](https://godoc.org/github.com/augustoroman/sandwich#Middleware.Code) for your handlers.
 
 ## Getting started
 
