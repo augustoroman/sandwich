@@ -1,5 +1,27 @@
 // Package httprouter_sandwich is a httprouter-adapter for sandwich that
 // provides the httprouter path parameters to the middleware stack.
+//
+// The Middleware implementation in this package is identical to the normal
+// sandwich.Middleware except:
+//  - it provides the httprouter.Params type by default for accessing route parameters
+//  - it has a .H field for getting the httprouter handler easily.
+//
+// Here's a simple example of using this:
+//
+//     s := httprouter_sandwich.TheUsual().Provide(...).With(...)
+//     m := httprouter.New()
+//     ...
+//     m.GET("/user/:id/", s.Provide(userdb).With(getUser).H)
+//     ...
+//
+//     func getUser(w http.ResponseWriter, p httprouter.Params, udb UserDb) error {
+//         userId := p["id"]
+//         user, err := udb.Lookup(userId)
+//         if err != nil {
+//             return err // or wrap with sandwich.Error{...}
+//         }
+//         return json.NewEncoder(w).Encode(user)
+//     }
 package httprouter_sandwich
 
 import (
@@ -32,22 +54,7 @@ func TheUsual() Middleware {
 // the httprouter.Params type so you can get the route parameters in your handlers.
 //
 // httprouter expects a function rather than a particular interface, so use the
-// .H accessor to get a httprouter-friendly handler.  For example:
-//
-//     s := httprouter_sandwich.TheUsual().Provide(...).With(...)
-//     m := httprouter.New()
-//     ...
-//     m.GET("/user/:id/", s.Provide(userdb).With(getUser).H)
-//     ...
-//
-//     func getUser(w http.ResponseWriter, p httprouter.Params, udb UserDb) error {
-//         userId := p["id"]
-//         user, err := udb.Lookup(userId)
-//         if err != nil {
-//             return err // or wrap with sandwich.Error{...}
-//         }
-//         return json.NewEncoder(w).Encode(user)
-//     }
+// .H accessor to get a httprouter-friendly handler.
 type Middleware sandwich.Middleware
 
 // H is the httprouter middleware handling function.  You normally won't call this

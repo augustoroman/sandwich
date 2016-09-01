@@ -1,5 +1,28 @@
 // Package martini_sandwich is a martini-adapter for sandwich that provides the
 // martini request parameters to the middleware stack.
+//
+// The Middleware implementation in this package is identical to the normal
+// sandwich.Middleware except:
+//  - it provides the martini.Params type by default for accessing route parameters
+//  - it has a .H field for getting the martini handler easily.
+//
+// Here's a simple example of using this:
+//
+//     s := martini_sandwich.TheUsual().Provide(...).With(...)
+//     m := martini.Classic()
+//     ...
+//     m.Get("/user/:id/", s.Provide(userdb).With(getUser).H) // <-- Note the .H
+//     ...
+//
+//     func getUser(w http.ResponseWriter, p martini.Params, udb UserDb) error {
+//         userId := p["id"]
+//         user, err := udb.Lookup(userId)
+//         if err != nil {
+//             return err // or wrap with sandwich.Error{...}
+//         }
+//         return json.NewEncoder(w).Encode(user)
+//     }
+//
 package martini_sandwich
 
 import (
@@ -32,23 +55,7 @@ func TheUsual() Middleware {
 // the martini.Params type so you can get the route parameters in your handlers.
 //
 // Martini expects a function rather than a particular interface, so use the
-// .H accessor to get a martini-friendly handler.  For example:
-//
-//     s := martini_sandwich.TheUsual().Provide(...).With(...)
-//     m := martini.Classic()
-//     ...
-//     m.Get("/user/:id/", s.Provide(userdb).With(getUser).H)
-//     ...
-//
-//     func getUser(w http.ResponseWriter, p martini.Params, udb UserDb) error {
-//         userId := p["id"]
-//         user, err := udb.Lookup(userId)
-//         if err != nil {
-//             return err // or wrap with sandwich.Error{...}
-//         }
-//         return json.NewEncoder(w).Encode(user)
-//     }
-//
+// .H accessor to get a martini-friendly handler.
 type Middleware sandwich.Middleware
 
 // H is the martini middleware handling function.  You normally won't call this
