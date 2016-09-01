@@ -2,10 +2,9 @@ package sandwich_test
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/augustoroman/sandwich"
-
-	"net/http"
 )
 
 type UserId string
@@ -54,41 +53,41 @@ func ExampleMiddleware_Code() {
 
 	// Output:
 	// func WelcomePage(
-	// 	sandwich_test_UserDb_val UserDb,
+	// 	userDb UserDb,
 	// ) func(
-	// 	http_ResponseWriter_val http.ResponseWriter,
-	// 	http_Request_ptr_val *http.Request,
+	// 	rw http.ResponseWriter,
+	// 	req *http.Request,
 	// ) {
 	// 	return func(
-	// 		http_ResponseWriter_val http.ResponseWriter,
-	// 		http_Request_ptr_val *http.Request,
+	// 		rw http.ResponseWriter,
+	// 		req *http.Request,
 	// 	) {
-	// 		var sandwich_ResponseWriter_ptr_val *sandwich.ResponseWriter
-	// 		http_ResponseWriter_val, sandwich_ResponseWriter_ptr_val = sandwich.WrapResponseWriter(http_ResponseWriter_val)
+	// 		var pResponseWriter *sandwich.ResponseWriter
+	// 		rw, pResponseWriter = sandwich.WrapResponseWriter(rw)
 	//
-	// 		var sandwich_LogEntry_ptr_val *sandwich.LogEntry
-	// 		sandwich_LogEntry_ptr_val = sandwich.StartLog(http_Request_ptr_val)
+	// 		var pLogEntry *sandwich.LogEntry
+	// 		pLogEntry = sandwich.StartLog(req)
 	//
 	// 		defer func() {
-	// 			(*sandwich.LogEntry).Commit(sandwich_LogEntry_ptr_val, sandwich_ResponseWriter_ptr_val)
+	// 			(*sandwich.LogEntry).Commit(pLogEntry, pResponseWriter)
 	// 		}()
 	//
-	// 		var sandwich_test_UserId_val UserId
+	// 		var userId UserId
 	// 		var err error
-	// 		sandwich_test_UserId_val, err = sandwich_test.GetUserIdFromRequest(http_Request_ptr_val)
+	// 		userId, err = sandwich_test.GetUserIdFromRequest(req)
 	// 		if err != nil {
-	// 			sandwich.HandleError(http_ResponseWriter_val, http_Request_ptr_val, sandwich_LogEntry_ptr_val, err)
+	// 			sandwich.HandleError(rw, req, pLogEntry, err)
 	// 			return
 	// 		}
 	//
-	// 		var sandwich_test_User_ptr_val *User
-	// 		sandwich_test_User_ptr_val, err = sandwich_test.LoadUser(sandwich_test_UserId_val, sandwich_test_UserDb_val)
+	// 		var pUser *User
+	// 		pUser, err = sandwich_test.LoadUser(userId, userDb)
 	// 		if err != nil {
-	// 			sandwich.HandleError(http_ResponseWriter_val, http_Request_ptr_val, sandwich_LogEntry_ptr_val, err)
+	// 			sandwich.HandleError(rw, req, pLogEntry, err)
 	// 			return
 	// 		}
 	//
-	// 		sandwich_test.WelcomePage(http_ResponseWriter_val, sandwich_test_User_ptr_val)
+	// 		sandwich_test.WelcomePage(rw, pUser)
 	//
 	// 	}
 	// }

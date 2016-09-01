@@ -2,6 +2,7 @@ package chain
 
 import (
 	"bytes"
+	"net/http"
 	"regexp"
 	"strings"
 	"testing"
@@ -13,22 +14,39 @@ func normalizeWhitespace(s string) string {
 
 func TestCodeGen(t *testing.T) {
 	var buf bytes.Buffer
-	New().Reserve("").With(a, b, c).Code("foo", "bar", &buf)
+
+	type User struct{}
+	type Http struct{}
+
+	New().
+		Reserve((*http.ResponseWriter)(nil)).
+		Provide("").
+		Provide(int64(0)).
+		Provide(int(1)).
+		Provide((*User)(nil)).
+		Provide(User{}).
+		Provide(Http{}).
+		With(a, b, c).
+		Code("foo", "bar", &buf)
 
 	const expected = `func foo(
+        str string,
+        i64 int64,
+        i int,
+        pUser *chain.User,
+        user chain.User,
+        chain_Http chain.Http,
       ) func(
-        string_val string,
+        rw http.ResponseWriter,
       ) {
         return func(
-          string_val string,
+	      rw http.ResponseWriter,
         ) {
-          string_val = chain.a()
+          str = chain.a()
 
-          var int_val int
-          string_val, int_val = chain.b(string_val)
+          str, i = chain.b(str)
 
-          chain.c(string_val, int_val)
-
+          chain.c(str, i)
         }
       }`
 	if normalizeWhitespace(buf.String()) != normalizeWhitespace(expected) {

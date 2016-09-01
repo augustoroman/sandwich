@@ -12,21 +12,24 @@ import (
 // Code writes the Go code for the current chain out to w assuming it lives in
 // package "pkg" with the specified handler function name
 func (c Chain) Code(name, pkg string, w io.Writer) {
-	vars := map[reflect.Type]string{}
+	vars := &nameMapper{}
+
+	for _, s := range c.steps {
+		vars.Reserve(s.valTyp.Name())
+		vars.Reserve(filepath.Base(s.valTyp.PkgPath()))
+	}
 
 	fmt.Fprintf(w, "func %s(\n", name)
 	for _, s := range c.steps {
 		switch s.typ {
 		case tVALUE:
-			vars[s.valTyp] = varNameForType(s.valTyp)
-			fmt.Fprintf(w, "\t%s %s,\n", vars[s.valTyp], strip(pkg, s.valTyp))
+			fmt.Fprintf(w, "\t%s %s,\n", vars.For(s.valTyp), strip(pkg, s.valTyp))
 		}
 	}
 	fmt.Fprintf(w, ") func(\n")
 	for _, s := range c.steps {
 		if s.typ == tRESERVE {
-			vars[s.valTyp] = varNameForType(s.valTyp)
-			fmt.Fprintf(w, "\t%s %s,\n", vars[s.valTyp], strip(pkg, s.valTyp))
+			fmt.Fprintf(w, "\t%s %s,\n", vars.For(s.valTyp), strip(pkg, s.valTyp))
 		}
 	}
 	fmt.Fprintf(w, ") {\n")
@@ -34,7 +37,7 @@ func (c Chain) Code(name, pkg string, w io.Writer) {
 	fmt.Fprintf(w, "\treturn func(\n")
 	for _, s := range c.steps {
 		if s.typ == tRESERVE {
-			fmt.Fprintf(w, "\t\t%s %s,\n", vars[s.valTyp], strip(pkg, s.valTyp))
+			fmt.Fprintf(w, "\t\t%s %s,\n", vars.For(s.valTyp), strip(pkg, s.valTyp))
 		}
 	}
 	fmt.Fprintf(w, "\t) {\n")
@@ -52,9 +55,8 @@ func (c Chain) Code(name, pkg string, w io.Writer) {
 
 		for i := 0; i < s.valTyp.NumOut(); i++ {
 			t := s.valTyp.Out(i)
-			if vars[t] == "" {
-				vars[t] = varNameForType(t)
-				fmt.Fprintf(w, "\t\tvar %s %s\n", vars[t], strip(pkg, t))
+			if !vars.Has(t) {
+				fmt.Fprintf(w, "\t\tvar %s %s\n", vars.For(t), strip(pkg, t))
 			}
 		}
 
@@ -94,7 +96,7 @@ func strip(pkg string, t reflect.Type) string {
 	return s
 }
 
-func getArgNames(vars map[reflect.Type]string, v reflect.Value) (name string, in, out []string, returnsError bool) {
+func getArgNames(vars *nameMapper, v reflect.Value) (name string, in, out []string, returnsError bool) {
 	name = runtime.FuncForPC(v.Pointer()).Name()
 	name = filepath.Base(name)
 	name = strings.TrimPrefix(name, "main.")
@@ -106,14 +108,14 @@ func getArgNames(vars map[reflect.Type]string, v reflect.Value) (name string, in
 	t := v.Type()
 	out = make([]string, t.NumOut())
 	for i := 0; i < t.NumOut(); i++ {
-		out[i] = vars[t.Out(i)]
+		out[i] = vars.For(t.Out(i))
 		if t.Out(i) == errorType {
 			returnsError = true
 		}
 	}
 	in = make([]string, t.NumIn())
 	for i := 0; i < t.NumIn(); i++ {
-		in[i] = vars[t.In(i)]
+		in[i] = vars.For(t.In(i))
 	}
 	return name, in, out, returnsError
 }
@@ -125,17 +127,4 @@ func hasError(str []string) bool {
 		}
 	}
 	return false
-}
-
-func varNameForType(t reflect.Type) string {
-	if t == errorType {
-		return "err"
-	}
-
-	suffix := "_val"
-	for t.Kind() == reflect.Ptr {
-		suffix = "_ptr" + suffix
-		t = t.Elem()
-	}
-	return strings.Replace(t.String(), ".", "_", -1) + suffix
 }
