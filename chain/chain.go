@@ -89,6 +89,11 @@ func (c Chain) ProvideAs(value, ifacePtr interface{}) Chain {
 			"ProvideAs, instead got %s", typ)
 	}
 	typ = typ.Elem()
+	// It's ok to pass in a nil value here if you want the interface to actually
+	// be nil.
+	if !val.IsValid() {
+		val = reflect.Zero(typ)
+	}
 	if !val.Type().Implements(typ) {
 		panicf("%s doesn't implement %s", val.Type(), typ)
 	}

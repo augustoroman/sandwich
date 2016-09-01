@@ -241,3 +241,15 @@ func TestDefaultErrorHandler(t *testing.T) {
 
 	assert.Equal(t, "onerr[☠]:", buf.String())
 }
+
+func TestProvideAsNil(t *testing.T) {
+	check := func(s fmt.Stringer) {
+		if s != nil {
+			t.Error("s should be nil!")
+		}
+	}
+	err := New().ProvideAs(nil, (*fmt.Stringer)(nil)).With(check).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
