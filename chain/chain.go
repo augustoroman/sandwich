@@ -1,4 +1,4 @@
-// Packing chain is a reflection-based dependency-injected handler chain that
+// Package chain is a reflection-based dependency-injected handler chain that
 // powers the sandwich middleware framework.
 package chain
 
