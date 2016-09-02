@@ -2,25 +2,20 @@
 
 This example demonstrates more advanced features of sandwich, including:
 
-* Providing interface types to the middleware chain.
+* Providing interface types to the middleware chain. <br/>
   TaskDb is the interface provided to the handlers, the actual value injected
   in main() is a taskDbImpl.
-
 * Using 3rd party middleware (go.auth, go.rice)
-
 * Using a 3rd party router (gorilla/mux)
-
-* Using multiple error handlers, and custom error handlers.
+* Using multiple error handlers, and custom error handlers. <br/>
   Most web servers will want to server a custom HTML error page for user-facing
   error pages.  An example of that is included here.  For AJAX calls, however,
   we don't want to serve HTML.  Instead, we always respond with JSON using the sandwich..  With
   sandwich, we the errors returned from handlers are agnostic.  Instead, the
   error handler decides what format to respond in.
-
-* Early exit of the middleware chain via the sandwich.Done error
+* Early exit of the middleware chain via the sandwich.Done error <br/>
   See `CheckForFakeLogin()` for usage.
-
-* Auto-generating handler code
+* Auto-generating handler code <br/>
   Besides using the normal sandwich middleware flow, this example also shows how
   to generate & use auto-generated handlers.  See the "auto_handlers.go" file
   for an example of the generated code, and the /auto/* endpoints use the
