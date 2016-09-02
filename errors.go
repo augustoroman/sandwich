@@ -23,6 +23,9 @@ type Error struct {
 
 func (e Error) Error() string {
 	msg := fmt.Sprintf("(%d) %s", e.Code, e.LogMsg)
+	if e.LogMsg == "" {
+		msg += e.ClientMsg
+	}
 	if e.Cause != nil {
 		msg += ": " + e.Cause.Error()
 	}

@@ -74,6 +74,7 @@ func TestLogger(t *testing.T) {
 	logBuf.Reset()
 	resp = httptest.NewRecorder()
 	req, _ = http.NewRequest("GET", "/", nil)
+	req.RequestURI = req.URL.String()
 	req.Header.Add("X-Real-IP", "123.456.789.0")
 	TheUsual().With(addsNote).ServeHTTP(resp, req)
 	validateLogMessage(t, logBuf.String(), _GREEN,
@@ -83,6 +84,7 @@ func TestLogger(t *testing.T) {
 	logBuf.Reset()
 	resp = httptest.NewRecorder()
 	req, _ = http.NewRequest("POST", "/slow", nil)
+	req.RequestURI = req.URL.String()
 	req.Header.Add("X-Forwarded-For", "<any string>")
 	TheUsual().With(slowSendMsg).ServeHTTP(resp, req)
 	validateLogMessage(t, logBuf.String(), _YELLOW,
@@ -92,6 +94,7 @@ func TestLogger(t *testing.T) {
 	logBuf.Reset()
 	resp = httptest.NewRecorder()
 	req, _ = http.NewRequest("BOO!", "/fail", nil)
+	req.RequestURI = req.URL.String()
 	req.RemoteAddr = "[::1]:56596"
 	TheUsual().With(fail).ServeHTTP(resp, req)
 	validateLogMessage(t, logBuf.String(), _RED,
@@ -102,6 +105,7 @@ func TestLogger(t *testing.T) {
 	logBuf.Reset()
 	resp = httptest.NewRecorder()
 	req, _ = http.NewRequest("PUT", "/slowfail", nil)
+	req.RequestURI = req.URL.String()
 	req.RemoteAddr = "[::1]:56596"
 	req.Header.Add("X-Forwarded-For", "<any string>")
 	req.Header.Add("X-Real-IP", "123.456.789.0") // takes precedence
@@ -110,11 +114,21 @@ func TestLogger(t *testing.T) {
 		`2001-02-03T04:05:06Z 123.456.789.0 "PUT /slowfail" (500 22B 1.013s) `+"\n"+
 			`  ERROR: (500) Failure: It went horribly wrong`)
 
+	// Test a suppressed log.
+	logBuf.Reset()
+	resp = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/", nil)
+	TheUsual().With(NoLog, addsNote).ServeHTTP(resp, req)
+	if logBuf.String() != "" {
+		t.Errorf("Expected no log output, but got [%s]", logBuf.String())
+	}
+
 	// Test that a panic should be recorded.
 	var log LogEntry
 	WriteLog = func(e LogEntry) { log = e }
 	resp = httptest.NewRecorder()
 	req, _ = http.NewRequest("PUT", "/slowfail", nil)
+	req.RequestURI = req.URL.String()
 	req.RemoteAddr = "<remote>"
 	TheUsual().With(panics).ServeHTTP(resp, req)
 

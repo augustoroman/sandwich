@@ -38,7 +38,18 @@ type LogEntry struct {
 	Elapsed      time.Duration
 	Error        error
 	Note         map[string]string
+	Quiet        bool // set to true to suppress logging this request
 }
+
+// NoLog is a middleware function that suppresses log output for this request.
+// For example:
+//
+//    // suppress logging of the favicon request to reduce log spam.
+//    http.Handle("/favicon.ico", s.With(NoLog, staticHandler))
+//
+// This depends on WriteLog respecting the Quiet flag, which the default
+// implementation does.
+func NoLog(e *LogEntry) { e.Quiet = true }
 
 // StartLog creates a *LogEntry and initializes it with basic request
 // information.
@@ -72,11 +83,14 @@ const (
 // and errors red.  You can replace the function to adjust the formatting or use
 // whatever logging library you like.
 var WriteLog = func(e LogEntry) {
-	col, reset := e.colors()
+	if e.Quiet {
+		return
+	}
+	col, reset := logColors(e)
 	fmt.Fprintf(os_Stderr, "%s%s %s \"%s %s\" (%d %dB %s) %s%s\n",
 		col,
 		e.Start.Format(time.RFC3339), e.RemoteIp,
-		e.Request.Method, e.Request.URL.Path,
+		e.Request.Method, e.Request.RequestURI,
 		e.StatusCode, e.ResponseSize, e.Elapsed,
 		e.NotesAndError(),
 		reset)
@@ -96,7 +110,7 @@ func (l LogEntry) NotesAndError() string {
 	return msg
 }
 
-func (e LogEntry) colors() (start, reset string) {
+func logColors(e LogEntry) (start, reset string) {
 	col, reset := _GREEN, _RESET
 	if e.Elapsed > 30*time.Millisecond {
 		col = _YELLOW
