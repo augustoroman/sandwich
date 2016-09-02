@@ -1,0 +1,7 @@
+{
+  "host": "localhost:5000",
+  "port": 5000,
+  "cookie-secret": "123456789012345678901234",
+  "oauth2-client-id": "see README.md",
+  "oauth2-client-secret": "see README.md"
+}

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TODO List</title>
+  <style type="text/css">
+    #tasks li.done { text-decoration: line-through; color: gray; }
+    #notice {
+      position: absolute;
+      bottom: 50px;
+      left: 50px;
+      right: 50px;
+      border: 1px solid gray;
+      background: #EEE;
+      height: 1em;
+      padding: 5px;
+    }
+  </style>
+</head>
+<body>
+  Hello {{.User.Name}}
+  <br>
+  [
+    <a href="/">Normal handlers</a> |
+    <a href="/auto/">Auto-generated handlers</a> |
+    <a href="/auth/logout">Sign out</a>
+  ]
+  <br/><hr/>
+
+
+  Here's your TODO list:
+  <ul id='tasks'>
+  {{ range .Tasks }}
+    <li id='task{{.Id}}' class='{{if .Done}}done{{end}}' onclick='toggle(this)'>{{.Desc}}</li>
+  {{ end }}
+  </ul>
+  <hr>
+  Add a new task:
+  <form onsubmit='return addTask(this)'>
+    Description: <input type="text" name="desc" size='50'/>
+    <input type="submit" value="Add"/>
+  </form>
+
+  <div id='notice'></div>
+
+  <script type="text/javascript" src="/static/main.js"></script>
+</body>
+</html>

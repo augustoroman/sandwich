@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Welcome to a sample todo app</title>
+  <style type="text/css">
+    form {
+      display: inline-block;
+      margin-left: 2ex;
+      border: 1px solid #CCC;
+      padding: 5px;
+    }
+  </style>
+</head>
+<body>
+Please sign in to start making your todo list:
+<ul>
+  <li>Use the fake sign-in to sign in as anyone: <br/>
+    <form method="GET" action="/auth/login">
+      Id: <input type="text" name="id" size=50 placeholder="12345" /><br/>
+      Name: <input type="text" name="name" size=50 placeholder="Alice" /><br/>
+      Email: <input type="text" name="email" size=50 placeholder="alice@example.com" /><br/>
+      <input type="submit" value="Login">
+    </form><p/>
+  </li>
+  <li><a href="/auth/login">Sign in with Google</a><br/>For this, you must have
+    configured the oauth client id and secret into the config.json file.
+    See README.md for details.</li>
+</ul>.
+</body>
+</html>
