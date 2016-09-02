@@ -46,7 +46,10 @@ func main() {
 }
 ```
 
-For more examples, see the examples directory.
+See the [examples directory](examples/) for:
+* A [hello-world sample](examples/0-helloworld)
+* A [basic usage](examples/1-simple) demo
+* A [TODO app](examples/2-advanced) showing advanced usage including custom error handling, embedded files, code generation, & login and authentication via oauth.
 
 Note that *sandwich doesn't provide any routing*.  You can use it with any other
 router, for example:
