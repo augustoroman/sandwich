@@ -23,6 +23,8 @@ func TestNameMapper(t *testing.T) {
 
 	type Req struct{}
 	assert.Equal(t, "chain_Req", n.For(reflect.TypeOf(Req{})), "chain.Req (could've been req, but that's taken)")
+	assert.Equal(t, "pReq", n.For(reflect.TypeOf(&Req{})), "*chain.Req")
+	assert.Equal(t, "pppReq", n.For(reflect.TypeOf((***Req)(nil))), "***chain.Req")
 
 	var c map[string]struct {
 		A []byte
@@ -34,7 +36,7 @@ func TestNameMapper(t *testing.T) {
 	var d map[string]struct {
 		A_uint8_B chan bool
 	}
-	assert.Equal(t, "__var10__", n.For(reflect.TypeOf(d)),
+	assert.Equal(t, "__var12__", n.For(reflect.TypeOf(d)),
 		"inlined struct with var name that conflicts")
 
 	assert.Equal(t, "u8", n.For(reflect.TypeOf(byte(0))), "single byte")

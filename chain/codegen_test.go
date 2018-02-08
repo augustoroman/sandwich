@@ -12,6 +12,10 @@ func normalizeWhitespace(s string) string {
 	return regexp.MustCompile(`\s+`).ReplaceAllLiteralString(strings.TrimSpace(s), " ")
 }
 
+type TestDb struct{}
+
+func (t *TestDb) Validate(s string) {}
+
 func TestCodeGen(t *testing.T) {
 	var buf bytes.Buffer
 
@@ -26,27 +30,33 @@ func TestCodeGen(t *testing.T) {
 		Provide((*User)(nil)).
 		Provide(User{}).
 		Provide(Http{}).
+		Provide(&TestDb{}).
+		With((*TestDb).Validate).
 		With(a, b, c).
-		Code("foo", "bar", &buf)
+		Code("foo", "chain", &buf)
 
 	const expected = `func foo(
         str string,
         i64 int64,
         i int,
-        pUser *chain.User,
-        user chain.User,
-        chain_Http chain.Http,
+        pUser *User,
+        user User,
+        chain_Http Http,
+        pTestDb *TestDb,
       ) func(
         rw http.ResponseWriter,
       ) {
         return func(
-	      rw http.ResponseWriter,
+          rw http.ResponseWriter,
         ) {
-          str = chain.a()
+          (*TestDb).Validate(pTestDb, str)
 
-          str, i = chain.b(str)
+          str = a()
 
-          chain.c(str, i)
+          str, i = b(str)
+
+          c(str, i)
+
         }
       }`
 	if normalizeWhitespace(buf.String()) != normalizeWhitespace(expected) {

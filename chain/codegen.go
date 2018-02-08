@@ -64,7 +64,7 @@ func (c Chain) Code(name, pkg string, w io.Writer) {
 			fmt.Fprintf(w, "\t\tdefer func() {\n\t")
 		}
 
-		name, inVars, outVars, returnsError := getArgNames(vars, s.val)
+		name, inVars, outVars, returnsError := getArgNames(pkg, vars, s.val)
 
 		fmt.Fprintf(w, "\t\t")
 		if len(outVars) > 0 {
@@ -73,7 +73,7 @@ func (c Chain) Code(name, pkg string, w io.Writer) {
 		fmt.Fprintf(w, "%s(%s)\n", name, strings.Join(inVars, ", "))
 
 		if returnsError {
-			name, inVars, _, _ := getArgNames(vars, errHandler.val)
+			name, inVars, _, _ := getArgNames(pkg, vars, errHandler.val)
 			fmt.Fprintf(w, "\t\tif err != nil {\n")
 			fmt.Fprintf(w, "\t\t\t%s(%s)\n", name, strings.Join(inVars, ", "))
 			fmt.Fprintf(w, "\t\t\treturn\n")
@@ -90,19 +90,23 @@ func (c Chain) Code(name, pkg string, w io.Writer) {
 }
 
 func strip(pkg string, t reflect.Type) string {
-	s := t.String()
+	return stripStr(pkg, t.String())
+}
+func stripStr(pkg, s string) string {
 	pos := strings.IndexFunc(s, func(r rune) bool { return r != '*' })
 	s = s[:pos] + strings.TrimPrefix(s[pos:], pkg+".")
 	return s
 }
 
-func getArgNames(vars *nameMapper, v reflect.Value) (name string, in, out []string, returnsError bool) {
+func getArgNames(pkg string, vars *nameMapper, v reflect.Value) (name string, in, out []string, returnsError bool) {
 	name = runtime.FuncForPC(v.Pointer()).Name()
 	name = filepath.Base(name)
-	name = strings.TrimPrefix(name, "main.")
+	name = strings.TrimPrefix(name, pkg+".")
 
 	if pos := strings.Index(name, ".(*"); pos > 0 {
-		name = "(*" + name[:pos+1] + name[pos+3:]
+		pkgName := name[:pos+1]
+		pkgName = strings.TrimPrefix(pkgName, pkg+".")
+		name = "(*" + pkgName + name[pos+3:]
 	}
 
 	t := v.Type()

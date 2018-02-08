@@ -93,7 +93,7 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Code generates and returns pure-Go code for this middeware stack.
+// Code generates and returns pure-Go code for this middleware stack.
 // Dependency-injection too magical for you?  Reflection too slow?  Auto-
 // generate the code for the handler and use that instead!  You must provide
 // the package name that the generated code should be in as well as the overall
