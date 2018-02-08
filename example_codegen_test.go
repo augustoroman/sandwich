@@ -74,20 +74,20 @@ func ExampleMiddleware_Code() {
 	//
 	// 		var userId UserId
 	// 		var err error
-	// 		userId, err = sandwich_test.GetUserIdFromRequest(req)
+	// 		userId, err = GetUserIdFromRequest(req)
 	// 		if err != nil {
 	// 			sandwich.HandleError(rw, req, pLogEntry, err)
 	// 			return
 	// 		}
 	//
 	// 		var pUser *User
-	// 		pUser, err = sandwich_test.LoadUser(userId, userDb)
+	// 		pUser, err = LoadUser(userId, userDb)
 	// 		if err != nil {
 	// 			sandwich.HandleError(rw, req, pLogEntry, err)
 	// 			return
 	// 		}
 	//
-	// 		sandwich_test.WelcomePage(rw, pUser)
+	// 		WelcomePage(rw, pUser)
 	//
 	// 	}
 	// }
