@@ -74,7 +74,7 @@ For example, you can use this to provide your database to all handlers:
 func main() {
     db_conn := ConnectToDatabase(...)
     s := sandwich.TheUsual().Provide(db_conn)
-    http.Handle("/", s.With(home))
+    http.Handle("/", s.With(Home))
 }
 
 func Home(w http.ResponseWriter, r *http.Request, db_conn *Database) {
