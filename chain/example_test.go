@@ -32,7 +32,7 @@ func ExampleFunc() {
 			fmt.Println("elapsed:", dt)
 		})
 
-	panicOnErr(example.Run(time.Duration(30 * time.Millisecond)))
+	example.MustRun(time.Duration(30 * time.Millisecond))
 
 	// Print the equivalent code:
 	fmt.Println("Generated code is:")
@@ -74,7 +74,7 @@ func ExampleFunc_file() {
 	// This never fails -- any errors in creating the file or writing to it will
 	// be handled by the default error handler that logs a message, but the `Run`
 	// itself doesn't fail unless the args are incorrect.
-	panicOnErr(writeToFile.Run("test.txt", []byte("the data")))
+	writeToFile.MustRun("test.txt", []byte("the data"))
 
 	content, err := os.ReadFile("test.txt")
 	panicOnErr(err)

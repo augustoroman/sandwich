@@ -60,10 +60,7 @@ type Middleware sandwich.Middleware
 // H is the httprouter middleware handling function.  You normally won't call this
 // function directly but rather you'll pass it to httprouter.
 func (m Middleware) H(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	err := chain.Func(m).Run(w, r, p)
-	if err != nil {
-		panic(err)
-	}
+	chain.Func(m).MustRun(w, r, p)
 }
 
 func (m Middleware) mw() sandwich.Middleware { return sandwich.Middleware(m) }

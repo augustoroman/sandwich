@@ -247,6 +247,17 @@ func (c Func) Defer(handler interface{}) Func {
 	return c.with(step{tPOST_HANDLER, fn.Func, fn.Func.Type()})
 }
 
+// MustRun will function chain with the provided args and panic if the args
+// don't match the expected arg values.
+func (c Func) MustRun(argValues ...interface{}) {
+	// This will only ever return an error if the arguments to Run don't match.
+	// Runtime failures of the functions in the chain are handled by the
+	// registered error handlers (or the default error handler which may panic).
+	if err := c.Run(argValues...); err != nil {
+		panic(err)
+	}
+}
+
 // Run executes the function chain. All declared args must be provided in the
 // order than they were declared. This will return an error only if the
 // arguments do not exactly correspond to the declared args. Interface values
