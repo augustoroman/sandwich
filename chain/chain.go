@@ -71,7 +71,6 @@ package chain
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"reflect"
 	"runtime"
 	"strings"
@@ -84,9 +83,7 @@ var errorType = reflect.TypeOf((*error)(nil)).Elem()
 // handler has been registered. Warning! The default error handler is not
 // checked to verify that it's arguments can be provided. It's STRONGLY
 // recommended to keep this as absolutely simple as possible.
-var DefaultErrorHandler interface{} = func(err error) {
-	log.Printf("Unhandled error: %v", err)
-}
+var DefaultErrorHandler interface{} = func(err error) { panic(err) }
 
 // Func defines the chain of functions to invoke when Run. Each Func is
 // immutable: all operations will return a new Func chain.
