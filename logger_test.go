@@ -60,7 +60,7 @@ func TestLogger(t *testing.T) {
 	time_Now = clk.Now
 
 	// Useful handlers:
-	sendMsg := func(w http.ResponseWriter) { w.Write([]byte("Hi there")) }
+	sendMsg := func(w http.ResponseWriter) { _, _ = w.Write([]byte("Hi there")) }
 	slowSendMsg := func(w http.ResponseWriter) { clk.Sleep(100 * time.Millisecond); sendMsg(w) }
 	fail := func() error { return errors.New("It went horribly wrong") }
 	slowFail := func() error { clk.Sleep(time.Second); return fail() }

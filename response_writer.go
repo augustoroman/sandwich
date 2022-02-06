@@ -31,10 +31,6 @@ func (w *ResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return hijacker.Hijack()
 }
 
-func (w *ResponseWriter) CloseNotify() <-chan bool {
-	return w.ResponseWriter.(http.CloseNotifier).CloseNotify()
-}
-
 func (w *ResponseWriter) Flush() {
 	flusher, ok := w.ResponseWriter.(http.Flusher)
 	if ok {

@@ -19,8 +19,8 @@ var userInfo = struct {
 }
 
 func write204(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) }
-func hello(w http.ResponseWriter, r *http.Request)    { w.Write([]byte("Hello there!")) }
-func sendjson(w http.ResponseWriter, r *http.Request) { json.NewEncoder(w).Encode(userInfo) }
+func hello(w http.ResponseWriter, r *http.Request)    { _, _ = w.Write([]byte("Hello there!")) }
+func sendjson(w http.ResponseWriter, r *http.Request) { _ = json.NewEncoder(w).Encode(userInfo) }
 
 func makeWrite204_TheUsual() Middleware { return TheUsual().Then(NoLog, write204) }
 func makeWrite204_Bare() Middleware     { return New().Then(write204) }

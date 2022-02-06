@@ -187,23 +187,3 @@ var wellKnownTypesAndCommonNames = map[reflect.Type][]string{
 	reflect.TypeOf(false):                              {"flag"},
 	errorType:                                          {"err"},
 }
-
-func uniqueVarNameForType(t reflect.Type) string {
-	if t == errorType {
-		return "err"
-	}
-
-	suffix := "_val"
-	for t.Kind() == reflect.Ptr || t.Kind() == reflect.Slice {
-		if t.Kind() == reflect.Ptr {
-			suffix = "_ptr" + suffix
-		} else if t.Kind() == reflect.Slice {
-			suffix = "_slice" + suffix
-		}
-		t = t.Elem()
-	}
-	name := cleanTypeName(t.String())
-	name = strings.Replace(name, ".", "_", -1)
-	name = strings.Replace(name, " ", "_", -1)
-	return name + suffix
-}
