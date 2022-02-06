@@ -6,7 +6,7 @@ import (
 )
 
 func twoArg(a, b string) string {
-	return a + b
+	return a
 }
 
 func manyArg(a, b, c, d, e, f, g string) (s, t, u, v, w, y, z string) {
