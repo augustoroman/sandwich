@@ -45,7 +45,7 @@ type LogEntry struct {
 // For example:
 //
 //    // suppress logging of the favicon request to reduce log spam.
-//    http.Handle("/favicon.ico", s.With(NoLog, staticHandler))
+//    http.Handle("/favicon.ico", s.Then(NoLog, staticHandler))
 //
 // This depends on WriteLog respecting the Quiet flag, which the default
 // implementation does.

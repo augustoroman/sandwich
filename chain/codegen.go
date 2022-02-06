@@ -10,8 +10,8 @@ import (
 )
 
 // Code writes the Go code for the current chain out to w assuming it lives in
-// package "pkg" with the specified handler function name
-func (c Chain) Code(name, pkg string, w io.Writer) {
+// package "pkg" with the specified handler function name.
+func (c Func) Code(name, pkg string, w io.Writer) {
 	vars := &nameMapper{}
 
 	for _, s := range c.steps {
@@ -28,7 +28,7 @@ func (c Chain) Code(name, pkg string, w io.Writer) {
 	}
 	fmt.Fprintf(w, ") func(\n")
 	for _, s := range c.steps {
-		if s.typ == tRESERVE {
+		if s.typ == tARG {
 			fmt.Fprintf(w, "\t%s %s,\n", vars.For(s.valTyp), strip(pkg, s.valTyp))
 		}
 	}
@@ -36,7 +36,7 @@ func (c Chain) Code(name, pkg string, w io.Writer) {
 
 	fmt.Fprintf(w, "\treturn func(\n")
 	for _, s := range c.steps {
-		if s.typ == tRESERVE {
+		if s.typ == tARG {
 			fmt.Fprintf(w, "\t\t%s %s,\n", vars.For(s.valTyp), strip(pkg, s.valTyp))
 		}
 	}
@@ -44,7 +44,7 @@ func (c Chain) Code(name, pkg string, w io.Writer) {
 
 	errHandler := step{tERROR_HANDLER, reflect.ValueOf(DefaultErrorHandler), nil}
 	for _, s := range c.steps {
-		if s.typ == tRESERVE || s.typ == tVALUE {
+		if s.typ == tARG || s.typ == tVALUE {
 			continue
 		}
 
@@ -122,13 +122,4 @@ func getArgNames(pkg string, vars *nameMapper, v reflect.Value) (name string, in
 		in[i] = vars.For(t.In(i))
 	}
 	return name, in, out, returnsError
-}
-
-func hasError(str []string) bool {
-	for _, s := range str {
-		if s == "error" {
-			return true
-		}
-	}
-	return false
 }

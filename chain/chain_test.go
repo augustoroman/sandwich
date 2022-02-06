@@ -5,23 +5,25 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func New() Chain { return Chain{} }
+func New() Func { return Func{} }
 
 func TestInitialInjection(t *testing.T) {
 	var args []interface{}
 	recordArgs := func(a int, b string) { args = append(args, a, b) }
 
 	err := New().
-		Reserve(0).
-		Reserve("").
-		With(recordArgs).
-		Provide(3).
-		Provide("four").
-		With(recordArgs).
+		Arg(0).
+		Arg("").
+		Then(recordArgs).
+		Set(3).
+		Set("four").
+		Then(recordArgs).
 		Run(1, "two")
 	assert.NoError(t, err)
 
@@ -32,7 +34,7 @@ func TestInitialDeferredInjection(t *testing.T) {
 	var args []interface{}
 	recordArgs := func(a int, b string) { args = append(args, a, b) }
 
-	err := New().Reserve(0).Reserve("").With(recordArgs).Run(2, "xyz")
+	err := New().Arg(0).Arg("").Then(recordArgs).Run(2, "xyz")
 	assert.NoError(t, err)
 
 	assert.EqualValues(t, []interface{}{2, "xyz"}, args)
@@ -42,10 +44,10 @@ func TestDeferredExecutionOrder(t *testing.T) {
 	var buf bytes.Buffer
 	say := func(s string) func() { return func() { buf.WriteString(s + ":") } }
 	err := New().
-		With(say("a"), say("b")).
+		Then(say("a"), say("b")).
 		Defer(say("f")).
 		Defer(say("e")).
-		With(say("c")).
+		Then(say("c")).
 		Defer(say("d")).
 		Run()
 	assert.NoError(t, err)
@@ -58,19 +60,19 @@ func TestDeferredExecutionOrderWithErrors(t *testing.T) {
 	onErr := func(e error) { buf.WriteString("err[" + e.Error() + "]:") }
 	fail := func() error { return errors.New("failed") }
 	err := New().
-		With(say("a"), say("b")).
+		Then(say("a"), say("b")).
 		Defer(say("f")).
 		OnErr(onErr).
 		Defer(say("e")).
-		With(fail).
-		With(say("c")).
+		Then(fail).
+		Then(say("c")).
 		Defer(say("d")).
 		Run()
 	assert.NoError(t, err)
 	assert.Equal(t, "a:b:err[failed]:e:f:", buf.String())
 }
 
-func TestBasicChainExecution(t *testing.T) {
+func TestBasicFuncExecution(t *testing.T) {
 	a, b := 5, "hi"
 	provide_initial := func() (*int, *string) { return &a, &b }
 	verify_injected := func(x *int, y *string) {
@@ -83,7 +85,7 @@ func TestBasicChainExecution(t *testing.T) {
 	}
 	modify_injected := func(x *int, y *string) { *x = 6; *y = "bye" }
 
-	err := New().With(provide_initial, verify_injected, modify_injected).Run()
+	err := New().Then(provide_initial, verify_injected, modify_injected).Run()
 	assert.NoError(t, err)
 
 	assert.Equal(t, 6, a)
@@ -92,9 +94,9 @@ func TestBasicChainExecution(t *testing.T) {
 
 func TestSimpleErrorHandling(t *testing.T) {
 	var out string
-	chain := New().Reserve("").Reserve(0).
+	chain := New().Arg("").Arg(0).
 		OnErr(func(err error) { out += "First error handler: " + err.Error() }).
-		With(
+		Then(
 			func(val string) (string, error) {
 				if val == "foo" {
 					return "bar", nil
@@ -103,7 +105,7 @@ func TestSimpleErrorHandling(t *testing.T) {
 				}
 			}).
 		OnErr(func(err error) { out += "Second error handler: " + err.Error() }).
-		With(
+		Then(
 			func(num int) error {
 				if num != 3 {
 					return fmt.Errorf("%d is not 3", num)
@@ -125,28 +127,28 @@ func TestSimpleErrorHandling(t *testing.T) {
 }
 
 func TestMustProvideTypes(t *testing.T) {
-	assert.Panics(t, func() { New().With(func(string) {}) })
-	assert.NotPanics(t, func() { New().Provide("").With(func(string) {}) })
+	assert.Panics(t, func() { New().Then(func(string) {}) })
+	assert.NotPanics(t, func() { New().Set("").Then(func(string) {}) })
 
-	assert.Panics(t, func() { New().With(func(int, string) {}) })
-	assert.NotPanics(t, func() { New().Provide("").Provide(3).With(func(int, string) {}) })
+	assert.Panics(t, func() { New().Then(func(int, string) {}) })
+	assert.NotPanics(t, func() { New().Set("").Set(3).Then(func(int, string) {}) })
 
 	assert.NotPanics(t, func() {
-		New().With(
+		New().Then(
 			func() string { return "" },
 			func(string) int { return 3 },
 			func(int) {},
 		)
 	}, "Should be OK: Everything is provided by earlier functions.")
 	assert.NotPanics(t, func() {
-		New().With(
+		New().Then(
 			func() string { return "" },
 			func(string) int { return 3 },
 		).OnErr(func(int, error) {})
 	}, "Should be OK: Everything is provided by earlier functions")
 
 	assert.Panics(t, func() {
-		New().With(
+		New().Then(
 			func() string { return "" },
 			func(string) int { return 3 },
 			func(bool) {},
@@ -154,19 +156,20 @@ func TestMustProvideTypes(t *testing.T) {
 		)
 	}, "Should FAIL: bool isn't provided anywhere")
 	assert.Panics(t, func() {
-		New().With(func() string { return "" }, func(string) int { return 3 }).
+		New().Then(func() string { return "" }, func(string) int { return 3 }).
 			OnErr(func(bool, error) {}).
-			With(func(int) {})
+			Then(func(int) {})
 	}, "Should FAIL: bool isn't provided anywhere (even error handlers need proper provisioning)")
 }
 
 func TestErrorAbortsHandling(t *testing.T) {
 	var out string
-	New().OnErr(func(err error) { out += "Failed @ " + err.Error() }).With(
+	err := New().OnErr(func(err error) { out += "Failed @ " + err.Error() }).Then(
 		func() error { out += "1 "; return nil },
 		func() error { out += "2 "; return fmt.Errorf("2") },
 		func() error { out += "3 "; return nil },
 	).Run()
+	assert.NoError(t, err)
 	assert.Equal(t, "1 2 Failed @ 2", out)
 }
 
@@ -179,7 +182,8 @@ func TestCatchesPanics(t *testing.T) {
 	captureError := func(e error) { err = e }
 	panics := func() { panic("ahhhh! 🔥") }
 
-	New().OnErr(captureError).With(a, b, c).Defer(c).With(panics).Run()
+	assert.NoError(t,
+		New().OnErr(captureError).Then(a, b, c).Defer(c).Then(panics).Run())
 
 	assert.NotNil(t, err)
 
@@ -193,6 +197,9 @@ func TestCatchesPanics(t *testing.T) {
 
 	assert.Contains(t, err.Error(), "Panic executing middleware")
 	assert.Contains(t, err.Error(), "ahhhh! 🔥")
+	// This is where the panic actually occurred. This will need to be updated if
+	// this file changes, sadly.
+	assert.Contains(t, err.Error(), "/home/aroman/code/sandwich/chain/chain_test.go:183")
 	assert.Contains(t, err.Error(), "func() string")
 	assert.Contains(t, err.Error(), "func(string) (string, int)")
 	assert.Contains(t, err.Error(), "func(string, int)")
@@ -207,23 +214,23 @@ func TestDefersCanAcceptErrors(t *testing.T) {
 	deferred := func(err error) { fmt.Fprintf(&buf, "defer[%v]:", err) }
 	fails := func() error { return errors.New("💣") }
 
-	New().
+	assert.NoError(t, New().
 		OnErr(onerr).
-		With(a, b, c).
+		Then(a, b, c).
 		Defer(deferred).
-		With(fails).
-		Run()
+		Then(fails).
+		Run())
 
 	assert.Equal(t, "onerr[💣]:defer[💣]:", buf.String())
 
 	// But what if nothing actually fails?  Defer's can still accept errors.
 	buf.Reset()
-	New().
+	assert.NoError(t, New().
 		OnErr(onerr).
-		With(a, b, c).
+		Then(a, b, c).
 		Defer(deferred).
 		// With(fails).  // no failure!
-		Run()
+		Run())
 
 	assert.Equal(t, "defer[<nil>]:", buf.String())
 }
@@ -237,19 +244,88 @@ func TestDefaultErrorHandler(t *testing.T) {
 	defer func(orig interface{}) { DefaultErrorHandler = orig }(DefaultErrorHandler)
 	DefaultErrorHandler = onerr
 
-	New().With(fails).Run()
+	assert.NoError(t, New().Then(fails).Run())
 
 	assert.Equal(t, "onerr[☠]:", buf.String())
 }
 
-func TestProvideAsNil(t *testing.T) {
+func TestSetAs_Nil(t *testing.T) {
+	worked := false
 	check := func(s fmt.Stringer) {
-		if s != nil {
-			t.Error("s should be nil!")
-		}
+		require.Nil(t, s)
+		worked = true
 	}
-	err := New().ProvideAs(nil, (*fmt.Stringer)(nil)).With(check).Run()
-	if err != nil {
-		t.Fatal(err)
-	}
+	err := New().SetAs(nil, (*fmt.Stringer)(nil)).Then(check).Run()
+	require.NoError(t, err)
+	require.True(t, worked)
+}
+
+func TestProvidingBadValues(t *testing.T) {
+	assert.Panics(t, func() { New().Set(nil) })
+
+	// ifacePtr must be a pointer to an interface
+	assert.Panics(t, func() { New().SetAs(nil, 5) })
+	type Struct struct{}
+	assert.Panics(t, func() { New().SetAs(nil, Struct{}) })
+	assert.Panics(t, func() { New().SetAs(nil, &Struct{}) })
+
+	// SetAs value must actually implement the specified interface
+	assert.Panics(t, func() { New().SetAs(5, (*fmt.Stringer)(nil)) })
+	assert.Panics(t, func() { New().SetAs(Struct{}, (*fmt.Stringer)(nil)) })
+}
+
+func TestWithBadValues(t *testing.T) {
+	type Struct struct{}
+	assert.Panics(t, func() { New().Then(nil) })
+	assert.Panics(t, func() { New().Then(5) })
+	assert.Panics(t, func() { New().Then(Struct{}) })
+}
+
+func TestBadErrorHandler(t *testing.T) {
+	//  The error handler must actually be a function
+	assert.Panics(t, func() { New().OnErr(true) })
+	//  The error handler may not return any values.
+	returnsSomething := func(err error) bool { return true }
+	assert.Panics(t, func() { New().OnErr(returnsSomething) })
+	//  The error handler can't take args of types that have not yet been
+	//  provided.
+	takesAString := func(str string, err error) {}
+	assert.Panics(t, func() { New().OnErr(takesAString) })
+}
+
+func TestBadDefer(t *testing.T) {
+	assert.Panics(t, func() { New().Defer(true) },
+		"deferred func must actually be a function")
+
+	returnsSomething := func(err error) bool { return true }
+	assert.Panics(t, func() { New().Defer(returnsSomething) },
+		"deferred func may not return any values")
+
+	takesAString := func(str string) {}
+	assert.Panics(t, func() { New().Defer(takesAString) },
+		"deferred func arg types must have already been provided")
+}
+
+func TestBadRunArgs(t *testing.T) {
+	chain := New().
+		Arg(int(0)).
+		Arg((*fmt.Stringer)(nil)).
+		Then(func(i int) string { return fmt.Sprint(i) })
+
+	assert.Error(t, chain.Run(), "not all reserved values are specified")
+	assert.Error(t, chain.Run(0), "not all reserved values are specified")
+	assert.Error(t, chain.Run(0, nil), "not all reserved values are specified")
+	var nilStringer fmt.Stringer
+	assert.Error(t, chain.Run(0, &nilStringer, true), "non-reserved values are specified")
+}
+
+func TestRunWithNilReservedInterface(t *testing.T) {
+	var capturedStringer fmt.Stringer = time.Now()
+	chain := New().
+		Arg((*fmt.Stringer)(nil)).
+		Then(func(s fmt.Stringer) { capturedStringer = s })
+
+	var nilStringer fmt.Stringer
+	require.NoError(t, chain.Run(&nilStringer))
+	assert.Nil(t, capturedStringer)
 }

@@ -1,5 +1,71 @@
-// Package chain is a reflection-based dependency-injected handler chain that
-// powers the sandwich middleware framework.
+// Package chain is a reflection-based dependency-injected chain of functions
+// that powers the sandwich middleware framework.
+//
+// A Func chain represents a sequence of functions to call along with an initial
+// input. The parameters to each function are automatically provided from either
+// the initial inputs or return values of earlier functions in the sequence.
+//
+// In contrast to other dependency-injection frameworks, chain does not
+// automatically determine how to provide dependencies -- it merely uses the
+// most recently-provided value. This enables chains to report errors
+// immediately during the chain construction and, if successfully constructed, a
+// chain will always be able to be executed.
+//
+// HTTP Middleware Example
+//
+// As a common example, chains in http handling middleware typically start with
+// the http.ResponseWriter and *http.Request provided by the http framework:
+//
+//   base := chain.Func{}.
+//     Arg((*http.ResponseWriter)(nil)).  // declared as an arg when Run
+//     Arg((*http.Request)(nil)).         // declared as an arg when Run
+//
+// Given the following functions:
+//
+//   func GetDB() (*UserDB, error) {...}
+//   func GetUserFromRequest(db *UserDB, req *http.Request) (*User, error) {...}
+//   func SendUserAsJSON(w http.ResponseWriter, u *User) error {...}
+//
+//   func GetUserID(r *http.Request) (UserID, error) {...}
+//   func (db *UserDB) Lookup(UserID) (*User, error) { ... }
+//
+//   func SendProjectAsJSON(w http.ResponseWriter, p *Project) error {...}
+//
+// then these chains would work fine:
+//
+//   base.Then(
+//     GetDB,              // takes no args ✅, provides *UserDB to later funcs
+//     GetUserFromRequest, // takes *UserDB ✅ and *Request ✅, provides *User
+//     SendUserAsJSON,     // takes ResponseWriter ✅ and *User ✅
+//   )
+//
+//   base.Then(
+//     GetDB,            // takes no args ✅, provides *UserDB to later funcs
+//     GetUserID,        // takes *Request ✅, provides UserID
+//     (*UserDB).Lookup, // takes *UserDB ✅ and UserID ✅, provides *User
+//     SendUserAsJSON,   // takes ResponseWriter ✅ and *User ✅
+//   )
+//
+// but these chains would fail:
+//
+//   base.Then(
+//     GetUserFromRequest, // takes *UserDB ❌ and *Request ✅
+//     GetDB,              // this *UserDB isn't available yet.
+//     SendUserAsJSON,     //
+//   )
+//
+//   base.Then(
+//     GetDB,             // takes no args ✅, provides *UserDB to later funcs
+//     GetUserID,         // takes *Request ✅, provides UserID
+//     (*UserDB).Lookup,  // takes *UserDB ✅ and UserID ✅, provides *User
+//     SendProjectAsJSON, // takes ResponseWriter ✅ and *Project ❌
+//   )
+//
+//   base.Then(
+//     GetUserFromRequest, // takes *UserDB ❌ and *Request ✅
+//     SendUserAsJSON,     //
+//   )
+//
 package chain
 
 import (
@@ -16,18 +82,18 @@ import (
 var errorType = reflect.TypeOf((*error)(nil)).Elem()
 
 // DefaultErrorHandler is called when an error in the chain occurs and no error
-// handler has been registered.  Warning!  The default error handler is not
-// checked to verify that it's arguments can be provided.  It's STRONGLY
+// handler has been registered. Warning! The default error handler is not
+// checked to verify that it's arguments can be provided. It's STRONGLY
 // recommended to keep this as absolutely simple as possible.
 var DefaultErrorHandler interface{} = func(err error) {
 	log.Printf("Unhandled error: %v", err)
 }
 
-// Chain holds the stack of middleware handlers to execute.  Chain is immutable:
-// all operations will return a new chain.
-type Chain struct{ steps []step }
+// Func defines the chain of functions to invoke when Run. Each Func is
+// immutable: all operations will return a new Func chain.
+type Func struct{ steps []step }
 
-// step is a single value or handler in the middleware stack.  Each step has a
+// step is a single value or handler in the middleware stack. Each step has a
 // typ flag that indicates what kind of step it is.
 type step struct {
 	typ stepType
@@ -42,7 +108,7 @@ type step struct {
 type stepType uint8
 
 const (
-	tRESERVE stepType = iota
+	tARG stepType = iota
 	tVALUE
 	tPRE_HANDLER  // PRE handlers are the normal handlers
 	tPOST_HANDLER // POST handlers are deferred handlers
@@ -50,43 +116,42 @@ const (
 )
 
 // Clone this chain and add the extra steps to the clone.
-func (c Chain) with(steps ...step) Chain {
+func (c Func) with(steps ...step) Func {
 	s := make([]step, 0, len(c.steps)+len(steps))
 	s = append(s, c.steps...)
 	s = append(s, steps...)
-	return Chain{s}
+	return Func{s}
 }
 
-// Reserve indicates that the specified type will provided by the Run(...) call
-// when the chain starts.  This is typically necessary to start the chain for
-// a given middleware framework.  Reserve should not be exposed to users of
-// sandwich since it bypasses the causal checks and risks runtime errors.
-func (c Chain) Reserve(typePtr interface{}) Chain {
-	typ := reflect.TypeOf(typePtr)
+// Arg indicates that a value with the specified type will be a parameter to Run
+// when the Func is invoked. This is typically necessary to start the chain for
+// a given middleware framework. Arg should not be exposed to users of sandwich
+// since it bypasses the causal checks and risks runtime errors.
+func (c Func) Arg(typeOrInterfacePtr interface{}) Func {
+	typ := reflect.TypeOf(typeOrInterfacePtr)
 	if typ.Kind() == reflect.Ptr && typ.Elem().Kind() == reflect.Interface {
 		typ = typ.Elem()
 	}
-	return c.with(step{tRESERVE, reflect.Value{}, typ})
+	return c.with(step{tARG, reflect.Value{}, typ})
 }
 
-// Provide an immediate value.  This cannot be used to provide an interface,
-// instead use ProvideAs(...) or With(...) with a function that returns the
-// interface.
-func (c Chain) Provide(value interface{}) Chain {
+// Set an immediate value. This cannot be used to provide an interface, instead
+// use SetAs(...) or With(...) with a function that returns the interface.
+func (c Func) Set(value interface{}) Func {
 	if value == nil {
-		panicf("Provide(nil) is not allowed -- " +
-			"did you mean to use ProvideAs(val, (*IFace)(nil))?")
+		panicf("Set(nil) is not allowed -- " +
+			"did you mean to use SetAs(val, (*IFace)(nil))?")
 	}
 	return c.with(step{tVALUE, reflect.ValueOf(value), reflect.TypeOf(value)})
 }
 
-// ProvideAs provides an immediate value as the specified interface type.
-func (c Chain) ProvideAs(value, ifacePtr interface{}) Chain {
+// SetAs provides an immediate value as the specified interface type.
+func (c Func) SetAs(value, ifacePtr interface{}) Func {
 	val := reflect.ValueOf(value)
 	typ := reflect.TypeOf(ifacePtr)
 	if typ.Kind() != reflect.Ptr || typ.Elem().Kind() != reflect.Interface {
 		panicf("ifacePtr must be a pointer to an interface for "+
-			"ProvideAs, instead got %s", typ)
+			"SetAs, instead got %s", typ)
 	}
 	typ = typ.Elem()
 	// It's ok to pass in a nil value here if you want the interface to actually
@@ -101,13 +166,13 @@ func (c Chain) ProvideAs(value, ifacePtr interface{}) Chain {
 }
 
 // Compute what types are available from the reserved values, provide values,
-// and function return values of the current handler chain.  This excludes
+// and function return values of the current handler chain. This excludes
 // error handlers and deferred handlers.
-func (c Chain) typesAvailable() map[reflect.Type]bool {
+func (c Func) typesAvailable() map[reflect.Type]bool {
 	m := map[reflect.Type]bool{}
 	for _, s := range c.steps {
 		switch s.typ {
-		case tRESERVE:
+		case tARG:
 			m[s.valTyp] = true
 		case tVALUE:
 			m[s.val.Type()] = true
@@ -123,8 +188,9 @@ func (c Chain) typesAvailable() map[reflect.Type]bool {
 	return m
 }
 
-// With adds one or more handlers to the middleware chain.
-func (c Chain) With(handlers ...interface{}) Chain {
+// Then adds one or more handlers to the middleware chain. It may only accept
+// args of types that have already been provided.
+func (c Func) Then(handlers ...interface{}) Func {
 	steps := make([]step, len(handlers))
 	available := c.typesAvailable()
 	for i, handler := range handlers {
@@ -145,8 +211,8 @@ func (c Chain) With(handlers ...interface{}) Chain {
 }
 
 // OnErr registers an error handler to be called for failures of subsequent
-// handlers.
-func (c Chain) OnErr(errorHandler interface{}) Chain {
+// handlers. It may only accept args of types that have already been provided.
+func (c Func) OnErr(errorHandler interface{}) Func {
 	fn, err := valueOfFunction(errorHandler)
 	if err != nil {
 		panicf("Error handler %v", err)
@@ -164,11 +230,11 @@ func (c Chain) OnErr(errorHandler interface{}) Chain {
 }
 
 // Defer adds a deferred handler to be executed after all normal handlers and
-// error handlers have been called.  Deferred handlers are executed in reverse
-// order that they were registered (most recent first).  Deferred handlers can
-// accept the error type even if it hasn't been explicitly provided yet.  If no
+// error handlers have been called. Deferred handlers are executed in reverse
+// order that they were registered (most recent first). Deferred handlers can
+// accept the error type even if it hasn't been explicitly provided yet. If no
 // error has occurred, it will be nil.
-func (c Chain) Defer(handler interface{}) Chain {
+func (c Func) Defer(handler interface{}) Func {
 	fn, err := valueOfFunction(handler)
 	if err != nil {
 		panicf("Defer(...) arg %v", err)
@@ -185,10 +251,14 @@ func (c Chain) Defer(handler interface{}) Chain {
 	return c.with(step{tPOST_HANDLER, fn.Func, fn.Func.Type()})
 }
 
-// Run executes the middleware chain using the specified values as initial
-// values for all reserved types. All reserved types must be specified, and no
-// non-reserved types may be provided here.
-func (c Chain) Run(reservedValues ...interface{}) error {
+// Run executes the function chain. All declared args must be provided. This
+// will return an error only if the arguments do not exactly correspond to the
+// declared args. Interface values must be passed as pointers to the interface.
+//
+// Important note: The returned error is NOT related to whether any the calls of
+// chain returns an error -- any errors returned by functions in the chain are
+// handled by the registered error handlers.
+func (c Func) Run(argValues ...interface{}) error {
 	data := map[reflect.Type]reflect.Value{}
 	postSteps := []step{} // collect post steps here
 	errHandler := step{   // Initialize using the default error handler.
@@ -198,14 +268,14 @@ func (c Chain) Run(reservedValues ...interface{}) error {
 	}
 	stack := []step{}
 
-	// 1: Apply all of the reserved values.  Make sure that the reserved values
+	// 1: Apply all of the reserved values. Make sure that the reserved values
 	// match the reserve calls, because otherwise they will be ignored!
 
 	// Apply all of the provided reserved values.
 	rvMap := map[reflect.Type]bool{}
-	for i, val := range reservedValues {
+	for i, val := range argValues {
 		if val == nil {
-			return fmt.Errorf("reserved value may not be <nil> (%s arg of Run(...))",
+			return fmt.Errorf("arg may not be <nil> (%s arg of Run(...))",
 				ordinalize(i+1))
 		}
 		rv := reflect.ValueOf(val)
@@ -221,45 +291,44 @@ func (c Chain) Run(reservedValues ...interface{}) error {
 
 	// Ensure that all of the reserved values have been provided
 	for _, step := range c.steps {
-		if step.typ == tRESERVE {
+		if step.typ == tARG {
 			if _, provided := data[step.valTyp]; !provided {
-				providedReservedValues := make([]string, len(reservedValues))
-				for i, val := range reservedValues {
+				providedReservedValues := make([]string, len(argValues))
+				for i, val := range argValues {
 					providedReservedValues[i] = reflect.TypeOf(val).String()
 				}
-				return fmt.Errorf("Cannot run chain, type %s was reserved "+
-					"but no initial value was provided.  Provided types: %s",
+				return fmt.Errorf("Cannot run chain: missing value for arg of type %s."+
+					" Provided types: %s",
 					step.valTyp, providedReservedValues)
 			}
 			delete(rvMap, step.valTyp)
 		}
 	}
 
-	// Make sure that no non-reserved types have bene provided.
+	// Make sure that no non-reserved types have been provided.
 	if len(rvMap) != 0 {
 		var extra []string
 		for t := range rvMap {
 			extra = append(extra, t.String())
 		}
 		sort.Strings(extra)
-		return fmt.Errorf("Run(...) was called with additional types that were "+
-			"not reserved: %s", extra)
+		return fmt.Errorf("Run(...) was called with unexpected arguments: %s", extra)
 	}
 
-	// Start executing handlers.  First pass through is the normal call chain,
-	// so we skip execution of error handlers and deferred handlers, although
-	// we keep track of them.
+	// Start executing the function chain. First pass through is the normal call
+	// chain, so we skip execution of error handlers and deferred handlers,
+	// although we keep track of them.
 execution:
 	for _, step := range c.steps {
 		switch step.typ {
-		case tRESERVE:
+		case tARG:
 			// ignored now, already handled during initialization above.
 		case tVALUE:
 			data[step.val.Type()] = step.val
 			data[step.valTyp] = step.val
 		case tPRE_HANDLER:
 			c.call(step, data, &stack)
-			// Check to see if there's an error.  If so, abort the chain.
+			// Check to see if there's an error. If so, abort the chain.
 			if errorVal := data[errorType]; errorVal.IsValid() && !errorVal.IsNil() {
 				break execution
 			}
@@ -285,7 +354,7 @@ execution:
 	return nil
 }
 
-func (c Chain) call(s step, data map[reflect.Type]reflect.Value, stack *[]step) {
+func (c Func) call(s step, data map[reflect.Type]reflect.Value, stack *[]step) {
 	t := s.valTyp
 	in := make([]reflect.Value, t.NumIn())
 	for i := range in {
@@ -293,7 +362,7 @@ func (c Chain) call(s step, data map[reflect.Type]reflect.Value, stack *[]step) 
 		// This isn't supposed to happen if we've done all our checks right.
 		if !in[i].IsValid() {
 			name := runtime.FuncForPC(s.val.Pointer()).Name()
-			panicf("Cannot inject %s arg of type %s into %s (%s).  Data: %v",
+			panicf("Cannot inject %s arg of type %s into %s (%s). Data: %v",
 				ordinalize(i+1), t.In(i), name, t, data)
 		}
 	}
@@ -309,7 +378,7 @@ func (c Chain) call(s step, data map[reflect.Type]reflect.Value, stack *[]step) 
 	}
 }
 
-func (c Chain) wrapPanic(x interface{}, steps []step) error {
+func (c Func) wrapPanic(x interface{}, steps []step) error {
 	if x == nil {
 		return nil
 	}
@@ -332,7 +401,7 @@ func (c Chain) wrapPanic(x interface{}, steps []step) error {
 	}
 }
 
-// PanicError is the error that is returned if a handler panics.  It includes
+// PanicError is the error that is returned if a handler panics. It includes
 // the panic'd value (Val), the raw Go stack trace (RawStack), and the
 // middleware execution history (MiddlewareStack) that shows what middleware
 // functions have already been called.
@@ -352,7 +421,7 @@ type FuncInfo struct {
 
 // FilteredStack returns the stack trace without some internal chain.* functions
 // and without reflect.Value.call stack frames, since these are generally just
-// noise.  The reflect.Value.call removal could affect user stack frames.
+// noise. The reflect.Value.call removal could affect user stack frames.
 //
 // TODO(aroman): Refine filtering so that it only removes reflect.Value.call
 // frames due to sandwich.
@@ -362,7 +431,8 @@ func (p PanicError) FilteredStack() []string {
 	for i := 0; i < len(lines); i++ {
 		line := lines[i]
 		if strings.HasPrefix(line, "github.com/augustoroman/sandwich/chain") &&
-			!strings.HasPrefix(line, "github.com/augustoroman/sandwich/chain.Chain.Run(") {
+			!strings.HasPrefix(line, "github.com/augustoroman/sandwich/chain.Func.Run(") &&
+			!strings.HasPrefix(line, "github.com/augustoroman/sandwich/chain.Test") {
 			i++
 			continue
 		}

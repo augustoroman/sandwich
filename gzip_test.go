@@ -13,7 +13,7 @@ func TestGzip(t *testing.T) {
 	greet := func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hi there!")
 	}
-	handler := Gzip(New()).With(greet)
+	handler := Gzip(New()).Then(greet)
 
 	resp := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/", nil)

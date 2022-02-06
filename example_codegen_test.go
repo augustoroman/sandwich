@@ -46,8 +46,8 @@ func WelcomePage(w http.ResponseWriter, u *User) {
 
 func ExampleMiddleware_Code() {
 	udb := UserDb{}
-	mw := sandwich.TheUsual().Provide(udb).
-		With(GetUserIdFromRequest, LoadUser, WelcomePage)
+	mw := sandwich.TheUsual().Set(udb).
+		Then(GetUserIdFromRequest, LoadUser, WelcomePage)
 
 	fmt.Print(mw.Code("sandwich_test", "WelcomePage"))
 

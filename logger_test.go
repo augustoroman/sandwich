@@ -76,7 +76,7 @@ func TestLogger(t *testing.T) {
 	req, _ = http.NewRequest("GET", "/", nil)
 	req.RequestURI = req.URL.String()
 	req.Header.Add("X-Real-IP", "123.456.789.0")
-	TheUsual().With(addsNote).ServeHTTP(resp, req)
+	TheUsual().Then(addsNote).ServeHTTP(resp, req)
 	validateLogMessage(t, logBuf.String(), _GREEN,
 		`2001-02-03T04:05:06Z 123.456.789.0 "GET /" (200 8B 13ms)   a="x" b="y"`)
 
@@ -86,7 +86,7 @@ func TestLogger(t *testing.T) {
 	req, _ = http.NewRequest("POST", "/slow", nil)
 	req.RequestURI = req.URL.String()
 	req.Header.Add("X-Forwarded-For", "<any string>")
-	TheUsual().With(slowSendMsg).ServeHTTP(resp, req)
+	TheUsual().Then(slowSendMsg).ServeHTTP(resp, req)
 	validateLogMessage(t, logBuf.String(), _YELLOW,
 		`2001-02-03T04:05:06Z <any string> "POST /slow" (200 8B 113ms)`)
 
@@ -96,7 +96,7 @@ func TestLogger(t *testing.T) {
 	req, _ = http.NewRequest("BOO!", "/fail", nil)
 	req.RequestURI = req.URL.String()
 	req.RemoteAddr = "[::1]:56596"
-	TheUsual().With(fail).ServeHTTP(resp, req)
+	TheUsual().Then(fail).ServeHTTP(resp, req)
 	validateLogMessage(t, logBuf.String(), _RED,
 		`2001-02-03T04:05:06Z [::1]:56596 "BOO! /fail" (500 22B 13ms) `+"\n"+
 			`  ERROR: (500) Failure: It went horribly wrong`)
@@ -109,7 +109,7 @@ func TestLogger(t *testing.T) {
 	req.RemoteAddr = "[::1]:56596"
 	req.Header.Add("X-Forwarded-For", "<any string>")
 	req.Header.Add("X-Real-IP", "123.456.789.0") // takes precedence
-	TheUsual().With(slowFail).ServeHTTP(resp, req)
+	TheUsual().Then(slowFail).ServeHTTP(resp, req)
 	validateLogMessage(t, logBuf.String(), _RED,
 		`2001-02-03T04:05:06Z 123.456.789.0 "PUT /slowfail" (500 22B 1.013s) `+"\n"+
 			`  ERROR: (500) Failure: It went horribly wrong`)
@@ -118,7 +118,7 @@ func TestLogger(t *testing.T) {
 	logBuf.Reset()
 	resp = httptest.NewRecorder()
 	req, _ = http.NewRequest("GET", "/", nil)
-	TheUsual().With(NoLog, addsNote).ServeHTTP(resp, req)
+	TheUsual().Then(NoLog, addsNote).ServeHTTP(resp, req)
 	if logBuf.String() != "" {
 		t.Errorf("Expected no log output, but got [%s]", logBuf.String())
 	}
@@ -130,7 +130,7 @@ func TestLogger(t *testing.T) {
 	req, _ = http.NewRequest("PUT", "/slowfail", nil)
 	req.RequestURI = req.URL.String()
 	req.RemoteAddr = "<remote>"
-	TheUsual().With(panics).ServeHTTP(resp, req)
+	TheUsual().Then(panics).ServeHTTP(resp, req)
 
 	if err, ok := ToError(log.Error).Cause.(chain.PanicError); !ok {
 		t.Errorf("log error should be a panic, but is: %#v", log.Error)

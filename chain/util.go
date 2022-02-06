@@ -52,12 +52,12 @@ func checkCanCall(available map[reflect.Type]bool, fn FuncInfo) error {
 		} else if len(candidates) == 1 {
 			suggestion = fmt.Sprintf(" Type %s is an interface that is "+
 				"implemented by the provided type %s.  Did you mean to use "+
-				"'.ProvideAs(val, (*%s)(nil))' instead of '.Provide(val)'?",
+				"'.SetAs(val, (*%s)(nil))' instead of '.Set(val)'?",
 				t, candidates[0], strip("main", t))
 		} else if len(candidates) > 1 {
 			suggestion = fmt.Sprintf(" Type %s is an interface that is implemented "+
 				"by %d provided types: %s.  If you meant to use one of those, use "+
-				"'.ProvideAs(val, (*someInterface)(nil))' to explicitly assign "+
+				"'.SetAs(val, (*someInterface)(nil))' to explicitly assign "+
 				"to that type.",
 				t, len(candidates), candidates)
 		}

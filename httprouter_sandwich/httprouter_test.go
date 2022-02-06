@@ -19,7 +19,7 @@ func TestParamsRouting(t *testing.T) {
 	// An example server using the martini_sandwich adapter.
 	s := httprouter_sandwich.TheUsual()
 	r := httprouter.New()
-	r.GET("/say/:greeting/:name", s.With(greet).H)
+	r.GET("/say/:greeting/:name", s.Then(greet).H)
 
 	// Call the server.
 	rw := httptest.NewRecorder()

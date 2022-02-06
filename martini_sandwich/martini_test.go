@@ -19,7 +19,7 @@ func TestMartiniParamsAvailability(t *testing.T) {
 	// An example server using the martini_sandwich adapter.
 	s := martini_sandwich.TheUsual()
 	m := martini.Classic()
-	m.Get("/say/:greeting/:name", s.With(greet).H) // <-- notice the .H
+	m.Get("/say/:greeting/:name", s.Then(greet).H) // <-- notice the .H
 
 	// Call the server.
 	rw := httptest.NewRecorder()

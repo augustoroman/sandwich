@@ -36,23 +36,23 @@ func main() {
 	// Create a typical sandwich middleware with logging and error-handling.
 	mw := sandwich.TheUsual().
 		// Inject config and user database; now available to all handlers.
-		ProvideAs(udb, (*UserDb)(nil)).
+		SetAs(udb, (*UserDb)(nil)).
 		// In this example, we'll always check to see if the user is logged in.
 		// If so, we'll add the user ID to the log entries.
-		With(ParseUserIfLoggedIn)
+		Then(ParseUserIfLoggedIn)
 
 	// If the user is logged in, they'll get a personalized landing page.
 	// Otherwise, they'll get a generic landing page.
-	http.Handle("/", mw.With(ShowLandingPage))
-	http.Handle("/login", mw.With(Login))
+	http.Handle("/", mw.Then(ShowLandingPage))
+	http.Handle("/login", mw.Then(Login))
 
 	// Some pages are only allowed if the user is logged in.
-	http.Handle("/user/profile", mw.With(FailIfNotAuthenticated, ShowUserProfile))
+	http.Handle("/user/profile", mw.Then(FailIfNotAuthenticated, ShowUserProfile))
 	// If you have multiple pages that require authentication, you could do:
-	//   authed := mw.With(FailIfNotAuthenticated)
-	//   http.Handle("/user/profile", authed.With(ShowUserProfile))
-	//   http.Handle("/user/...", authed.With(...))
-	//   http.Handle("/user/...", authed.With(...))
+	//   authed := mw.Then(FailIfNotAuthenticated)
+	//   http.Handle("/user/profile", authed.Then(ShowUserProfile))
+	//   http.Handle("/user/...", authed.Then(...))
+	//   http.Handle("/user/...", authed.Then(...))
 
 	log.Println("Serving on :8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {

@@ -23,16 +23,16 @@ func TestCodeGen(t *testing.T) {
 	type Http struct{}
 
 	New().
-		Reserve((*http.ResponseWriter)(nil)).
-		Provide("").
-		Provide(int64(0)).
-		Provide(int(1)).
-		Provide((*User)(nil)).
-		Provide(User{}).
-		Provide(Http{}).
-		Provide(&TestDb{}).
-		With((*TestDb).Validate).
-		With(a, b, c).
+		Arg((*http.ResponseWriter)(nil)).
+		Set("").
+		Set(int64(0)).
+		Set(int(1)).
+		Set((*User)(nil)).
+		Set(User{}).
+		Set(Http{}).
+		Set(&TestDb{}).
+		Then((*TestDb).Validate).
+		Then(a, b, c).
 		Code("foo", "chain", &buf)
 
 	const expected = `func foo(

@@ -11,9 +11,9 @@ import (
 // the handlers.
 func New() Middleware {
 	return Middleware(
-		chain.Chain{}.
-			Reserve((*http.ResponseWriter)(nil)).
-			Reserve((*http.Request)(nil)),
+		chain.Func{}.
+			Arg((*http.ResponseWriter)(nil)).
+			Arg((*http.Request)(nil)),
 	)
 }
 
@@ -22,47 +22,46 @@ func New() Middleware {
 // handling.
 func TheUsual() Middleware {
 	return New().
-		With(WrapResponseWriter).
+		Then(WrapResponseWriter).
 		Wrap(StartLog, (*LogEntry).Commit).
 		OnErr(HandleError)
 }
 
 // Middleware is the stack of middleware functions that powers sandwich's
-// deliciousness.  It implements http.ServeHTTP and is immutable: all mutating
+// deliciousness. It implements http.ServeHTTP and is immutable: all mutating
 // functions create a new instance.
-type Middleware chain.Chain
+type Middleware chain.Func
 
-func (m Middleware) chain() chain.Chain { return chain.Chain(m) }
+func (m Middleware) chain() chain.Func { return chain.Func(m) }
 
-// Provide makes the specified value available as an input parameter to
-// subsequent handlers.  If the same type has already been provided (either by
-// previous Provide(...) calls or as the return value of a handler), the old
-// value will be replaced by the newly provided value.
-func (m Middleware) Provide(val interface{}) Middleware {
-	return Middleware(m.chain().Provide(val))
+// Set makes the specified value available as an input parameter to subsequent
+// handlers. If the same type has already been set (either by previous Set(...)
+// calls or as the return value of a handler), the old value will be replaced by
+// the new value.
+func (m Middleware) Set(val interface{}) Middleware {
+	return Middleware(m.chain().Set(val))
 }
 
-// ProvideAs makes the specified value available under the interface type
-// pointed to by ifacePtr.  Because interfaces in Go are only used for static
-// typing, a pointer to the interface must be provided.   This is typically done
-// with a nil pointer, as in:
+// SetAs makes the specified value available under the interface type pointed to
+// by ifacePtr. Because interfaces in Go are only used for static typing, a
+// pointer to the interface must be provided. This is typically done with a nil
+// pointer, as in:
 //
-//   m.ProvideAs(myConcreteImpl, (*someInterface)(nil))
-func (m Middleware) ProvideAs(val, ifacePtr interface{}) Middleware {
-	return Middleware(m.chain().ProvideAs(val, ifacePtr))
+//   m.SetAs(myConcreteImpl, (*someInterface)(nil))
+func (m Middleware) SetAs(val, ifacePtr interface{}) Middleware {
+	return Middleware(m.chain().SetAs(val, ifacePtr))
 }
 
-// With adds one or more middleware handles to the stack.  Middleware handlers
-// may use any of the values previously provided either directly via
-// Provide(...) or from the return values of previous handlers in the entire
-// middleware stack.
-func (m Middleware) With(handlers ...interface{}) Middleware {
-	return Middleware(m.chain().With(handlers...))
+// Then adds one or more middleware handles to the stack. Middleware handlers
+// may use any of the values previously provided either directly via Set(...) or
+// from the return values of previous handlers in the entire middleware stack.
+func (m Middleware) Then(handlers ...interface{}) Middleware {
+	return Middleware(m.chain().Then(handlers...))
 }
 
-// OnErr adds a new error handler to the middleware stack.  The error handler
+// OnErr adds a new error handler to the middleware stack. The error handler
 // will handle any errors from subsequent middleware handles -- it will not
-// affect any handlers previously added to the middleware stack.  Error handlers
+// affect any handlers previously added to the middleware stack. Error handlers
 // may not return any values.
 func (m Middleware) OnErr(handler interface{}) Middleware {
 	return Middleware(m.chain().OnErr(handler))
@@ -70,16 +69,16 @@ func (m Middleware) OnErr(handler interface{}) Middleware {
 
 // Wrap adds two handlers: one that is called during the normal middleware
 // progression ('before') and one that is deferred until all other middleware
-// handlers and error handlers ('after') have been called.  Deferred handlers
-// are called in the reverse order that they are added, and may not return any
-// values.  The 'after' handler will only be run if the 'before' handler has run
+// handlers and error handlers ('after') have been called. Deferred handlers are
+// called in the reverse order that they are added, and may not return any
+// values. The 'after' handler will only be run if the 'before' handler has run
 // -- if the middleware chain is aborted before getting to 'before' (or if
-// 'before' returns an error), 'after' will not be called.  The 'before' handler
+// 'before' returns an error), 'after' will not be called. The 'before' handler
 // may be nil in which case only the after handler will be registered.
 func (m Middleware) Wrap(before, after interface{}) Middleware {
 	c := m.chain()
 	if before != nil {
-		c = c.With(before)
+		c = c.Then(before)
 	}
 	c = c.Defer(after)
 	return Middleware(c)

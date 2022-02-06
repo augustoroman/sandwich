@@ -22,12 +22,12 @@ func write204(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.Statu
 func hello(w http.ResponseWriter, r *http.Request)    { w.Write([]byte("Hello there!")) }
 func sendjson(w http.ResponseWriter, r *http.Request) { json.NewEncoder(w).Encode(userInfo) }
 
-func makeWrite204_TheUsual() Middleware { return TheUsual().With(NoLog, write204) }
-func makeWrite204_Bare() Middleware     { return New().With(write204) }
-func makeHello_TheUsual() Middleware    { return TheUsual().With(NoLog, hello) }
-func makeHello_Bare() Middleware        { return New().With(hello) }
-func makeSendJson_TheUsual() Middleware { return TheUsual().With(NoLog, sendjson) }
-func makeSendJson_Bare() Middleware     { return New().With(sendjson) }
+func makeWrite204_TheUsual() Middleware { return TheUsual().Then(NoLog, write204) }
+func makeWrite204_Bare() Middleware     { return New().Then(write204) }
+func makeHello_TheUsual() Middleware    { return TheUsual().Then(NoLog, hello) }
+func makeHello_Bare() Middleware        { return New().Then(hello) }
+func makeSendJson_TheUsual() Middleware { return TheUsual().Then(NoLog, sendjson) }
+func makeSendJson_Bare() Middleware     { return New().Then(sendjson) }
 
 func bench(N int, h http.Handler) {
 	req := httptest.NewRequest("GET", "/", nil)
@@ -46,17 +46,21 @@ func Benchmark_Hello_Generated_TheUsual(b *testing.B) { bench(b.N, Handler(gen_h
 func Benchmark_Hello_Dynamic_Bare(b *testing.B)       { bench(b.N, makeHello_Bare()) }
 func Benchmark_Hello_Dynamic_TheUsual(b *testing.B)   { bench(b.N, makeHello_TheUsual()) }
 
-func Benchmark_Write204_RawHTTP(b *testing.B)            { bench(b.N, Handler(write204)) }
-func Benchmark_Write204_Generated_Bare(b *testing.B)     { bench(b.N, Handler(gen_write204_bare())) }
-func Benchmark_Write204_Generated_TheUsual(b *testing.B) { bench(b.N, Handler(gen_write204_theusual())) }
-func Benchmark_Write204_Dynamic_Bare(b *testing.B)       { bench(b.N, makeWrite204_Bare()) }
-func Benchmark_Write204_Dynamic_TheUsual(b *testing.B)   { bench(b.N, makeWrite204_TheUsual()) }
+func Benchmark_Write204_RawHTTP(b *testing.B)        { bench(b.N, Handler(write204)) }
+func Benchmark_Write204_Generated_Bare(b *testing.B) { bench(b.N, Handler(gen_write204_bare())) }
+func Benchmark_Write204_Generated_TheUsual(b *testing.B) {
+	bench(b.N, Handler(gen_write204_theusual()))
+}
+func Benchmark_Write204_Dynamic_Bare(b *testing.B)     { bench(b.N, makeWrite204_Bare()) }
+func Benchmark_Write204_Dynamic_TheUsual(b *testing.B) { bench(b.N, makeWrite204_TheUsual()) }
 
-func Benchmark_SendJson_RawHTTP(b *testing.B)            { bench(b.N, Handler(sendjson)) }
-func Benchmark_SendJson_Generated_Bare(b *testing.B)     { bench(b.N, Handler(gen_sendjson_bare())) }
-func Benchmark_SendJson_Generated_TheUsual(b *testing.B) { bench(b.N, Handler(gen_sendjson_theusual())) }
-func Benchmark_SendJson_Dynamic_Bare(b *testing.B)       { bench(b.N, makeSendJson_Bare()) }
-func Benchmark_SendJson_Dynamic_TheUsual(b *testing.B)   { bench(b.N, makeSendJson_TheUsual()) }
+func Benchmark_SendJson_RawHTTP(b *testing.B)        { bench(b.N, Handler(sendjson)) }
+func Benchmark_SendJson_Generated_Bare(b *testing.B) { bench(b.N, Handler(gen_sendjson_bare())) }
+func Benchmark_SendJson_Generated_TheUsual(b *testing.B) {
+	bench(b.N, Handler(gen_sendjson_theusual()))
+}
+func Benchmark_SendJson_Dynamic_Bare(b *testing.B)     { bench(b.N, makeSendJson_Bare()) }
+func Benchmark_SendJson_Dynamic_TheUsual(b *testing.B) { bench(b.N, makeSendJson_TheUsual()) }
 
 func TestGenBenchmarkCode(t *testing.T) {
 	gen_functions := []string{

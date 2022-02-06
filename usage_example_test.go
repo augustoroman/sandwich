@@ -17,7 +17,7 @@ func TestMiddlware(t *testing.T) {
 	assert.NoError(t, err)
 
 	type Path string
-	New().With(
+	New().Then(
 		func(r *http.Request) Path { return Path(r.URL.Path) },
 		func(w http.ResponseWriter, r *http.Request, p Path) {
 			fmt.Fprintf(w, "%s %s", r.Method, p)
@@ -43,7 +43,7 @@ func TestMiddlewareWrap(t *testing.T) {
 		fmt.Fprintf(w, "%s", arg)
 	}
 
-	New().Provide("xyz").Wrap(before, after).With(during).ServeHTTP(recRw, r)
+	New().Set("xyz").Wrap(before, after).Then(during).ServeHTTP(recRw, r)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "before:abc:after", recRw.Body.String())

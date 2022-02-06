@@ -8,10 +8,10 @@
 //
 // Here's a simple example of using this:
 //
-//     s := martini_sandwich.TheUsual().Provide(...).With(...)
+//     s := martini_sandwich.TheUsual().Set(...).Then(...)
 //     m := martini.Classic()
 //     ...
-//     m.Get("/user/:id/", s.Provide(userdb).With(getUser).H) // <-- Note the .H
+//     m.Get("/user/:id/", s.Set(userdb).Then(getUser).H) // <-- Note the .H
 //     ...
 //
 //     func getUser(w http.ResponseWriter, p martini.Params, udb UserDb) error {
@@ -36,8 +36,8 @@ import (
 // New constructs a clean Middleware instance that provides martini's routing
 // params (martini.Params), ready for you to start piling on the handlers.
 func New() Middleware {
-	c := chain.Chain(sandwich.New()).
-		Reserve((martini.Params)(nil))
+	c := chain.Func(sandwich.New()).
+		Arg((martini.Params)(nil))
 	return Middleware(c)
 }
 
@@ -45,8 +45,8 @@ func New() Middleware {
 // default handlers installed and ready to go:  Request logging and simple error
 // handling.  It also provides martini's routing params (martini.Params).
 func TheUsual() Middleware {
-	c := chain.Chain(sandwich.TheUsual()).
-		Reserve((martini.Params)(nil))
+	c := chain.Func(sandwich.TheUsual()).
+		Arg((martini.Params)(nil))
 	return Middleware(c)
 }
 
@@ -61,7 +61,7 @@ type Middleware sandwich.Middleware
 // H is the martini middleware handling function.  You normally won't call this
 // function directly but rather you'll pass it to martini.
 func (m Middleware) H(w http.ResponseWriter, r *http.Request, p martini.Params) {
-	err := chain.Chain(m).Run(&w, r, p)
+	err := chain.Func(m).Run(&w, r, p)
 	if err != nil {
 		panic(err)
 	}
@@ -74,22 +74,22 @@ func (m Middleware) mw() sandwich.Middleware { return sandwich.Middleware(m) }
 // a martini_sandwich.Middleware wrapper instead.
 // ---------------------------------------------------------------------------
 
-// Provide is the same as (sandwich.Middleware).Provide, but returns a
+// Set is the same as (sandwich.Middleware).Set, but returns a
 // martini_sandwich.Middleware.
-func (m Middleware) Provide(val interface{}) Middleware {
-	return Middleware(m.mw().Provide(val))
+func (m Middleware) Set(val interface{}) Middleware {
+	return Middleware(m.mw().Set(val))
 }
 
-// ProvideAs is the same as (sandwich.Middleware).ProvideAs, but returns a
+// SetAs is the same as (sandwich.Middleware).SetAs, but returns a
 // martini_sandwich.Middleware.
-func (m Middleware) ProvideAs(val, ifacePtr interface{}) Middleware {
-	return Middleware(m.mw().ProvideAs(val, ifacePtr))
+func (m Middleware) SetAs(val, ifacePtr interface{}) Middleware {
+	return Middleware(m.mw().SetAs(val, ifacePtr))
 }
 
-// With is the same as (sandwich.Middleware).With, but returns a
+// Then is the same as (sandwich.Middleware).Then, but returns a
 // martini_sandwich.Middleware.
-func (m Middleware) With(handlers ...interface{}) Middleware {
-	return Middleware(m.mw().With(handlers...))
+func (m Middleware) Then(handlers ...interface{}) Middleware {
+	return Middleware(m.mw().Then(handlers...))
 }
 
 // OnErr is the same as (sandwich.Middleware).OnErr, but returns a

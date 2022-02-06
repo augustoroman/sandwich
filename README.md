@@ -1,6 +1,6 @@
 <img align="right" height=400 src="http://s3.amazonaws.com/foodspotting-ec2/reviews/3957590/thumb_600.jpg?1377120135" />
 
-# Sandwich: Delicious HTTP Middleware  [![Build Status](https://travis-ci.org/augustoroman/sandwich.svg?branch=master)](https://travis-ci.org/augustoroman/sandwich)  [![Coverage](https://gocover.io/_badge/github.com/augustoroman/sandwich?1)](https://gocover.io/github.com/augustoroman/sandwich)  [![Go Report Card](https://goreportcard.com/badge/github.com/augustoroman/sandwich)](https://goreportcard.com/report/github.com/augustoroman/sandwich)  [![GoDoc](https://godoc.org/github.com/augustoroman/sandwich?status.svg)](https://godoc.org/github.com/augustoroman/sandwich)
+# Sandwich: Delicious HTTP Middleware  [![Build Status](https://travis-ci.org/augustoroman/sandwich.svg?branch=master)](https://travis-ci.org/augustoroman/sandwich)  [![Coverage](https://gocover.io/_badge/github.com/augustoroman/sandwich?1)](https://gocover.io/github.com/augustoroman/sandwich)  [![Go Report Card](https://goreportcard.com/badge/github.com/augustoroman/sandwich)](https://goreportcard.com/report/github.com/augustoroman/sandwich)  [![GoDoc](https://pkg.go.dev/badge/github.com/augustoroman/sandwich)](https://pkg.go.dev/github.com/augustoroman/sandwich)
 
 *Keep pilin' it on!*
 
@@ -15,9 +15,9 @@ dependencies.  Use any router you like!
 * Ensures that middleware dependencies are safely provided -- avoids unsafe casting from generic context objects.
 * Detects missing dependencies *during route construction* (before the server starts listening!), not when the route is actually called.
 * Provides clear and helpful error messages.
-* Compatible with the [http.Handler](https://godoc.org/net/http#Handler) interface and lots of existing middleware.
+* Compatible with the [http.Handler](https://pkg.go.dev/net/http#Handler) interface and lots of existing middleware.
 * Provides just a touch of magic: enough to make things easier, but not enough to induce a debugging nightmare.
-* When extreme performance is necessary, sandwich can generate [reflection-free, non-magical idiomatic go code](https://godoc.org/github.com/augustoroman/sandwich#Middleware.Code) for your handlers.
+* When extreme performance is necessary, sandwich can generate [reflection-free, non-magical idiomatic go code](https://pkg.go.dev/github.com/augustoroman/sandwich#Middleware.Code) for your handlers.
 
 ## Getting started
 
@@ -37,7 +37,7 @@ func main() {
 	// Create a default sandwich middlware stack that includes logging and
 	// a simple error handler.
 	s := sandwich.TheUsual()
-	http.Handle("/", s.With(func(w http.ResponseWriter) {
+	http.Handle("/", s.Then(func(w http.ResponseWriter) {
 		fmt.Fprintf(w, "Hello world!")
 	}))
 	if err := http.ListenAndServe(":6060", nil); err != nil {
@@ -54,10 +54,10 @@ See the [examples directory](examples/) for:
 Note that *sandwich doesn't provide any routing*.  You can use it with any other
 router, for example:
 
-* [net/http](https://godoc.org/net/http) stdlib router
-* [httprouter](https://godoc.org/github.com/julienschmidt/httprouter) (use the [httprouter_sandwich](https://godoc.org/github.com/augustoroman/sandwich/httprouter_sandwich) adapter)
+* [net/http](https://pkg.go.dev/net/http) stdlib router
+* [httprouter](https://pkg.go.dev/github.com/julienschmidt/httprouter) (use the [httprouter_sandwich](https://pkg.go.dev/github.com/augustoroman/sandwich/httprouter_sandwich) adapter)
 * [gorilla/mux](http://www.gorillatoolkit.org/pkg/mux)
-* [martini](https://github.com/go-martini/martini) (use the [martini_sandwich](https://godoc.org/github.com/augustoroman/sandwich/martini_sandwich) adapter)
+* [martini](https://github.com/go-martini/martini) (use the [martini_sandwich](https://pkg.go.dev/github.com/augustoroman/sandwich/martini_sandwich) adapter)
 * ...or any other one you like.
 
 ## Usage
@@ -74,7 +74,8 @@ For example, you can use this to provide your database to all handlers:
 func main() {
     db_conn := ConnectToDatabase(...)
     s := sandwich.TheUsual().Provide(db_conn)
-    http.Handle("/", s.With(Home))
+    s := sandwich.TheUsual().Set(db_conn)
+    http.Handle("/", s.Then(Home))
 }
 
 func Home(w http.ResponseWriter, r *http.Request, db_conn *Database) {
@@ -82,7 +83,7 @@ func Home(w http.ResponseWriter, r *http.Request, db_conn *Database) {
 }
 ```
 
-Provide(...) and ProvideAs(...) are excellent alternatives to using global
+Set(...) and SetAs(...) are excellent alternatives to using global
 values, plus they keep your functions easy to test!
 
 
@@ -93,8 +94,8 @@ example extracting the user login:
 
 ```go
 func main() {
-    s := sandwich.TheUsual().With(ParseUserCookie)
-    http.Handle("/", s.With(SayHi))
+    s := sandwich.TheUsual().Then(ParseUserCookie)
+    http.Handle("/", s.Then(SayHi))
 }
 // You can write & test exactly this signature:
 func ParseUserCookie(r *http.Request) (User, error) { ... }
@@ -135,7 +136,7 @@ type ErrorPageTemplate *template.Template
 func main() {
     tpl := template.Must(template.ParseFiles("path/to/my/error_page.tpl"))
     s := sandwich.TheUsual().
-        Provide(ErrorPageTemplate(tpl)).
+        Set(ErrorPageTemplate(tpl)).
         OnErr(MyErrorHandler)
     ...
 }
@@ -202,9 +203,9 @@ the `*LogEntry` as its value receiver.
 
 ### Providing Interfaces
 
-Unfortunately, providing interfaces is a little tricky.  Since interfaces in
-Go are only used for static typing, the encapsulation isn't passed to
-functions that accept interface{}, like Provide().
+Unfortunately, set interface values is a little tricky.  Since interfaces in Go
+are only used for static typing, the encapsulation isn't passed to functions
+that accept interface{}, like Set().
 
 This means that if you have an interface and a concrete implementation, such
 as:
@@ -217,25 +218,25 @@ type userDbImpl struct { ... }
 func (u *userDbImpl) GetUserProfile(u User) (Profile, error) { ... }
 ```
 
-You cannot provide this to handlers directly via the Provide() call.
+You cannot provide this to handlers directly via the Set() call.
 
 ```go
 udb := &userDbImpl{...}
 // DOESN'T WORK: this will provide *userDbImpl, not UserDatabase
-s.Provide(udb)
-s.Provide((UserDatabase)(udb)) // DOESN'T WORK EITHER
+s.Set(udb)
+s.Set((UserDatabase)(udb)) // DOESN'T WORK EITHER
 udb_iface := UserDatabase(udb)
-s.Provide(&udb_iface)          // STILL DOESN'T WORK!
+s.Set(&udb_iface)          // STILL DOESN'T WORK!
 ```
 
-Instead, you have to either use ProvideAs() or With():
+Instead, you have to either use SetAs() or With():
 
 ```go
 udb := &userDbImpl{...}
-// either use ProvideAs() with a pointer to the interface
-s.ProvideAs(udb, (*UserDatabase)(nil))
+// either use SetAs() with a pointer to the interface
+s.SetAs(udb, (*UserDatabase)(nil))
 // or add a handler that returns the interface
-s.With(func() UserDatabase { return udb })
+s.Then(func() UserDatabase { return udb })
 ```
 
 It's a bit silly, but there you are.
@@ -251,7 +252,7 @@ For those of you familiar with martini, sandwich has a lot of similarities but i
 
 * ...have a router, it's only middleware handling.  You can use martini, httprouter, the default Go lib, etc to do routing.
 
-* ...stop processing middleware when something is written to the response.  You must return an error (e.g. [sandwich.Done](https://godoc.org/github.com/augustoroman/sandwich#pkg-variables)) to abort the middleware processing.
+* ...stop processing middleware when something is written to the response.  You must return an error (e.g. [sandwich.Done](https://pkg.go.dev/github.com/augustoroman/sandwich#pkg-variables)) to abort the middleware processing.
 
 * ...do some of the more esoteric things that martini does, like if a handler returns a string, then Martini assumes that's the response.  I've never seen those used outside of toy examples.
 
@@ -289,15 +290,15 @@ Have a request-scoped context allows you to pass values between middleware handl
 
 **Q: Why do I have to use _two_ functions (before & after) to wrap a request.  Why can't I just have one with a next() function?**
 
-Many middleware frameworks provide the capability to wrap a request via a next() function.  Sometimes it's part of a context object ([martini's Context.Next()](https://godoc.org/github.com/go-martini/martini#Context), [gin's Context.Next()](https://godoc.org/github.com/gin-gonic/gin#Context.Next)) and sometimes it's directly provided ([negroni's third handler arg](https://godoc.org/github.com/urfave/negroni#HandlerFunc)).
+Many middleware frameworks provide the capability to wrap a request via a next() function.  Sometimes it's part of a context object ([martini's Context.Next()](https://pkg.go.dev/github.com/go-martini/martini#Context), [gin's Context.Next()](https://pkg.go.dev/github.com/gin-gonic/gin#Context.Next)) and sometimes it's directly provided ([negroni's third handler arg](https://pkg.go.dev/github.com/urfave/negroni#HandlerFunc)).
 
 While implementing sandwich, I initially included a next() function until I realized it was impossible to validate the dependencies with such a function.  Sandwich guarantees that dependencies can be supplied, and therefore next() had to go.
 
-Instead, I took a tip from go and instead implemented [defer](https://godoc.org/github.com/augustoroman/sandwich/chain#Chain.Defer).  The wrap interface simply makes it obvious that there's a before and after.  This allows me to keep my dependency guarantee.
+Instead, I took a tip from go and instead implemented [defer](https://pkg.go.dev/github.com/augustoroman/sandwich/chain#Func.Defer).  The wrap interface simply makes it obvious that there's a before and after.  This allows me to keep my dependency guarantee.
 
 **Q: I like my hand-coded handlers, they are super fast!**
 
-Guess what?! Because of the structure that sandwich imposes on constructing middleware chains, it can actually [generate an idiomatic Go middleware function](https://godoc.org/github.com/augustoroman/sandwich#Middleware.Code) (with no reflection or depedency injection) to replace the sandwich calls!  So for those ultra time-sensitive functions, you can replace them with fast, generated code and still reap the benefits of using sandwich with your handlers!
+Guess what?! Because of the structure that sandwich imposes on constructing middleware chains, it can actually [generate an idiomatic Go middleware function](https://pkg.go.dev/github.com/augustoroman/sandwich#Middleware.Code) (with no reflection or depedency injection) to replace the sandwich calls!  So for those ultra time-sensitive functions, you can replace them with fast, generated code and still reap the benefits of using sandwich with your handlers!
 
 **Q: I don't know, it's still scary and terrible!**
 

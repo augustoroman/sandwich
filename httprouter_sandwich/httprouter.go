@@ -8,10 +8,10 @@
 //
 // Here's a simple example of using this:
 //
-//     s := httprouter_sandwich.TheUsual().Provide(...).With(...)
+//     s := httprouter_sandwich.TheUsual().Set(...).Then(...)
 //     m := httprouter.New()
 //     ...
-//     m.GET("/user/:id/", s.Provide(userdb).With(getUser).H)
+//     m.GET("/user/:id/", s.Set(userdb).Then(getUser).H)
 //     ...
 //
 //     func getUser(w http.ResponseWriter, p httprouter.Params, udb UserDb) error {
@@ -36,7 +36,7 @@ import (
 // params (httprouter.Params), ready for you to start piling on the handlers.
 func New() Middleware {
 	return Middleware(
-		chain.Chain(sandwich.New()).Reserve(
+		chain.Func(sandwich.New()).Arg(
 			(httprouter.Params)(nil)))
 }
 
@@ -45,7 +45,7 @@ func New() Middleware {
 // handling.  It also provides httprouter's routing params (httprouter.Params).
 func TheUsual() Middleware {
 	return Middleware(
-		chain.Chain(sandwich.TheUsual()).Reserve(
+		chain.Func(sandwich.TheUsual()).Arg(
 			(httprouter.Params)(nil)))
 }
 
@@ -60,7 +60,7 @@ type Middleware sandwich.Middleware
 // H is the httprouter middleware handling function.  You normally won't call this
 // function directly but rather you'll pass it to httprouter.
 func (m Middleware) H(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	err := chain.Chain(m).Run((*http.ResponseWriter)(&w), r, p)
+	err := chain.Func(m).Run((*http.ResponseWriter)(&w), r, p)
 	if err != nil {
 		panic(err)
 	}
@@ -73,22 +73,22 @@ func (m Middleware) mw() sandwich.Middleware { return sandwich.Middleware(m) }
 // an httprouter_sandwich.Middleware wrapper instead.
 // ---------------------------------------------------------------------------
 
-// Provide is the same as (sandwich.Middleware).Provide, but returns an
+// Set is the same as (sandwich.Middleware).Set, but returns an
 // httprouter_sandwich.Middleware.
-func (m Middleware) Provide(val interface{}) Middleware {
-	return Middleware(m.mw().Provide(val))
+func (m Middleware) Set(val interface{}) Middleware {
+	return Middleware(m.mw().Set(val))
 }
 
-// ProvideAs is the same as (sandwich.Middleware).ProvideAs, but returns an
+// SetAs is the same as (sandwich.Middleware).SetAs, but returns an
 // httprouter_sandwich.Middleware.
-func (m Middleware) ProvideAs(val, ifacePtr interface{}) Middleware {
-	return Middleware(m.mw().ProvideAs(val, ifacePtr))
+func (m Middleware) SetAs(val, ifacePtr interface{}) Middleware {
+	return Middleware(m.mw().SetAs(val, ifacePtr))
 }
 
-// With is the same as (sandwich.Middleware).With, but returns an
+// Then is the same as (sandwich.Middleware).Then, but returns an
 // httprouter_sandwich.Middleware.
-func (m Middleware) With(handlers ...interface{}) Middleware {
-	return Middleware(m.mw().With(handlers...))
+func (m Middleware) Then(handlers ...interface{}) Middleware {
+	return Middleware(m.mw().Then(handlers...))
 }
 
 // OnErr is the same as (sandwich.Middleware).OnErr, but returns an

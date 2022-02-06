@@ -12,7 +12,7 @@ func say(s string) func(http.ResponseWriter) {
 }
 
 func TestWrapOrder(t *testing.T) {
-	mw := New().With(say("a")).Wrap(say("b"), say("e")).Wrap(say("c"), say("d"))
+	mw := New().Then(say("a")).Wrap(say("b"), say("e")).Wrap(say("c"), say("d"))
 
 	w := httptest.NewRecorder()
 	r, _ := http.NewRequest("GET", "/", nil)
