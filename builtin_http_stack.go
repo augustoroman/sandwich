@@ -87,7 +87,7 @@ func (m Middleware) Wrap(before, after interface{}) Middleware {
 // ServerHTTP implements the http.Handler interface and provides the initial
 // http.ResponseWriter and *http.Request to the middleware chain.
 func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := m.chain().Run((*http.ResponseWriter)(&w), r); err != nil {
+	if err := m.chain().Run(w, r); err != nil {
 		panic(err) // This should never happen.
 	}
 }

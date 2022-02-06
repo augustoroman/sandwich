@@ -306,17 +306,76 @@ func TestBadDefer(t *testing.T) {
 		"deferred func arg types must have already been provided")
 }
 
+func TestInterfaceConversionOnRun(t *testing.T) {
+	chain := New().Arg((*fmt.Stringer)(nil))
+
+	assert.Error(t, chain.Run(), "missing arg")
+	assert.NoError(t, chain.Run(nil), "nil value is ok")
+
+	var stringer Stringer
+	assert.NoError(t, chain.Run(stringer), "implements stringer")
+	assert.NoError(t, chain.Run(&stringer), "implements stringer")
+
+	var ptrStringer PtrStringer
+	assert.Error(t, chain.Run(ptrStringer), "does not implement stringer")
+	assert.NoError(t, chain.Run(&ptrStringer), "implements stringer")
+
+	var ptrToPtrStringer *PtrStringer
+	assert.NoError(t, chain.Run(ptrToPtrStringer), "nil implements stringer")
+
+	var nilStringer fmt.Stringer
+	assert.NoError(t, chain.Run(nilStringer), "nil values are ok")
+
+	chain = New().Arg(0)
+	assert.Error(t, chain.Run(nil),
+		"nil values are not ok for non-pointers and non-interfaces")
+
+	type Struct struct{}
+	chain = New().Arg(&Struct{})
+	assert.NoError(t, chain.Run(nil), "nil values are ok for pointers to structs")
+	assert.NoError(t, chain.Run(&Struct{}), "nil values are ok for pointers to structs")
+	assert.Error(t, chain.Run(1), "ints don't match struct pointers")
+}
+
+type Stringer struct{}
+type PtrStringer struct{}
+
+func (Stringer) String() string     { return "yup" }
+func (*PtrStringer) String() string { return "yup" }
+
 func TestBadRunArgs(t *testing.T) {
 	chain := New().
 		Arg(int(0)).
-		Arg((*fmt.Stringer)(nil)).
-		Then(func(i int) string { return fmt.Sprint(i) })
+		Arg((*fmt.Stringer)(nil))
 
-	assert.Error(t, chain.Run(), "not all reserved values are specified")
-	assert.Error(t, chain.Run(0), "not all reserved values are specified")
-	assert.Error(t, chain.Run(0, nil), "not all reserved values are specified")
-	var nilStringer fmt.Stringer
-	assert.Error(t, chain.Run(0, &nilStringer, true), "non-reserved values are specified")
+	assert.Error(t, chain.Run(), "not all args are specified")
+	assert.Error(t, chain.Run(0), "not all args are specified")
+	assert.NoError(t, chain.Run(0, nil), "all args are specified")
+}
+
+func TestRunArgsMustExactlyMatchSpecifiedArgs(t *testing.T) {
+	chain := New().
+		Arg(int(0)).
+		Arg("").
+		Arg(true)
+
+	// OK
+	assert.NoError(t, chain.Run(0, "hi", true))
+
+	// Wrong ordering
+	assert.EqualError(t, chain.Run(true, "hi", 0),
+		"bad arg: 1st arg of Run(...) should be a int but is bool")
+	assert.EqualError(t, chain.Run(0, true, "hi"),
+		"bad arg: 2nd arg of Run(...) should be a string but is bool")
+
+	// Too many
+	assert.EqualError(t, chain.Run(0, "hi", true, 'x', 0),
+		"too many args: expected 3 args but got 5 args")
+	// Not enough
+	assert.EqualError(t, chain.Run(0, "hi"),
+		"missing args of types: [bool]")
+	assert.EqualError(t, chain.Run(0),
+		"missing args of types: [string bool]")
 }
 
 func TestRunWithNilReservedInterface(t *testing.T) {
@@ -325,7 +384,6 @@ func TestRunWithNilReservedInterface(t *testing.T) {
 		Arg((*fmt.Stringer)(nil)).
 		Then(func(s fmt.Stringer) { capturedStringer = s })
 
-	var nilStringer fmt.Stringer
-	require.NoError(t, chain.Run(&nilStringer))
+	require.NoError(t, chain.Run(nil))
 	assert.Nil(t, capturedStringer)
 }

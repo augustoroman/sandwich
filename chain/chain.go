@@ -74,7 +74,6 @@ import (
 	"log"
 	"reflect"
 	"runtime"
-	"sort"
 	"strings"
 	"text/tabwriter"
 )
@@ -251,9 +250,10 @@ func (c Func) Defer(handler interface{}) Func {
 	return c.with(step{tPOST_HANDLER, fn.Func, fn.Func.Type()})
 }
 
-// Run executes the function chain. All declared args must be provided. This
-// will return an error only if the arguments do not exactly correspond to the
-// declared args. Interface values must be passed as pointers to the interface.
+// Run executes the function chain. All declared args must be provided in the
+// order than they were declared. This will return an error only if the
+// arguments do not exactly correspond to the declared args. Interface values
+// must be passed as pointers to the interface.
 //
 // Important note: The returned error is NOT related to whether any the calls of
 // chain returns an error -- any errors returned by functions in the chain are
@@ -268,51 +268,10 @@ func (c Func) Run(argValues ...interface{}) error {
 	}
 	stack := []step{}
 
-	// 1: Apply all of the reserved values. Make sure that the reserved values
-	// match the reserve calls, because otherwise they will be ignored!
-
-	// Apply all of the provided reserved values.
-	rvMap := map[reflect.Type]bool{}
-	for i, val := range argValues {
-		if val == nil {
-			return fmt.Errorf("arg may not be <nil> (%s arg of Run(...))",
-				ordinalize(i+1))
-		}
-		rv := reflect.ValueOf(val)
-		rvt := rv.Type()
-		if rv.Kind() == reflect.Ptr && rv.Elem().Kind() == reflect.Interface {
-			rv = rv.Elem()
-			rvt = rv.Type()
-		}
-		data[rv.Type()] = rv
-		data[rvt] = rv
-		rvMap[rvt] = true
-	}
-
-	// Ensure that all of the reserved values have been provided
-	for _, step := range c.steps {
-		if step.typ == tARG {
-			if _, provided := data[step.valTyp]; !provided {
-				providedReservedValues := make([]string, len(argValues))
-				for i, val := range argValues {
-					providedReservedValues[i] = reflect.TypeOf(val).String()
-				}
-				return fmt.Errorf("Cannot run chain: missing value for arg of type %s."+
-					" Provided types: %s",
-					step.valTyp, providedReservedValues)
-			}
-			delete(rvMap, step.valTyp)
-		}
-	}
-
-	// Make sure that no non-reserved types have been provided.
-	if len(rvMap) != 0 {
-		var extra []string
-		for t := range rvMap {
-			extra = append(extra, t.String())
-		}
-		sort.Strings(extra)
-		return fmt.Errorf("Run(...) was called with unexpected arguments: %s", extra)
+	// 1: Apply all of the arguments to the available data. Make sure that the
+	// provided arguments match the Arg calls, otherwise we bomb.
+	if err := c.processRunArgs(data, argValues...); err != nil {
+		return err
 	}
 
 	// Start executing the function chain. First pass through is the normal call
@@ -351,6 +310,51 @@ execution:
 		c.call(postSteps[i], data, &stack)
 	}
 
+	return nil
+}
+
+func (c Func) processRunArgs(
+	data map[reflect.Type]reflect.Value,
+	argValues ...interface{},
+) error {
+	argIndex := 0
+	expectedNumArgs := 0
+	var missingArgs []string
+	for _, step := range c.steps {
+		if step.typ != tARG {
+			continue
+		}
+		expectedNumArgs++
+		if argIndex >= len(argValues) {
+			missingArgs = append(missingArgs, step.valTyp.String())
+			continue
+		}
+		val := argValues[argIndex]
+		argIndex++
+
+		if val == nil {
+			if step.valTyp.Kind() == reflect.Interface || step.valTyp.Kind() == reflect.Ptr {
+				data[step.valTyp] = reflect.New(step.valTyp).Elem()
+				continue
+			}
+			return fmt.Errorf("bad arg: %s arg of Run(...) should be a %s but is %v",
+				ordinalize(argIndex), step.valTyp, val)
+		}
+
+		rv := reflect.ValueOf(val)
+		if !rv.CanConvert(step.valTyp) {
+			return fmt.Errorf("bad arg: %s arg of Run(...) should be a %s but is %s",
+				ordinalize(argIndex), step.valTyp, rv.Type())
+		}
+		data[step.valTyp] = rv.Convert(step.valTyp)
+	}
+	if len(missingArgs) > 0 {
+		return fmt.Errorf("missing args of types: %s", missingArgs)
+	}
+	if argIndex != len(argValues) {
+		return fmt.Errorf("too many args: expected %d args but got %d args",
+			expectedNumArgs, len(argValues))
+	}
 	return nil
 }
 

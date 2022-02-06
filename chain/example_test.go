@@ -62,6 +62,8 @@ func ExampleFunc() {
 }
 
 func ExampleFunc_file() {
+	// Chains can be used to do file operations!
+
 	writeToFile := chain.Func{}.
 		Arg("").          // filename
 		Arg([]byte(nil)). // data
@@ -78,17 +80,10 @@ func ExampleFunc_file() {
 	panicOnErr(err)
 	fmt.Printf("test.txt: %s\n", content)
 
-	panicOnErr(writeToFile.Run([]byte("arg order doesn't matter"), "test.txt"))
-
-	content, err = os.ReadFile("test.txt")
-	panicOnErr(err)
-	fmt.Printf("test.txt: %s\n", content)
-
 	panicOnErr(os.Remove("test.txt"))
 
 	// Output:
 	// test.txt: the data
-	// test.txt: arg order doesn't matter
 }
 
 func panicOnErr(err error) {
