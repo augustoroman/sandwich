@@ -34,28 +34,28 @@ func main() {
 	udb := userDb{{"bob", "Bob", "bob@example.com"}, {"alice", "Alice", "alice@example.com"}}
 
 	// Create a typical sandwich middleware with logging and error-handling.
-	mw := sandwich.TheUsual().
-		// Inject config and user database; now available to all handlers.
-		SetAs(udb, (*UserDb)(nil)).
-		// In this example, we'll always check to see if the user is logged in.
-		// If so, we'll add the user ID to the log entries.
-		Then(ParseUserIfLoggedIn)
+	mux := sandwich.TheUsual()
+	// Inject config and user database; now available to all handlers.
+	mux.SetAs(udb, (*UserDb)(nil))
+	// In this example, we'll always check to see if the user is logged in.
+	// If so, we'll add the user ID to the log entries.
+	mux.Use(ParseUserIfLoggedIn)
 
 	// If the user is logged in, they'll get a personalized landing page.
 	// Otherwise, they'll get a generic landing page.
-	http.Handle("/", mw.Then(ShowLandingPage))
-	http.Handle("/login", mw.Then(Login))
+	mux.Get("/", ShowLandingPage)
+	mux.Post("/login", Login)
 
 	// Some pages are only allowed if the user is logged in.
-	http.Handle("/user/profile", mw.Then(FailIfNotAuthenticated, ShowUserProfile))
+	mux.Get("/user/profile", FailIfNotAuthenticated, ShowUserProfile)
 	// If you have multiple pages that require authentication, you could do:
 	//   authed := mw.Then(FailIfNotAuthenticated)
 	//   http.Handle("/user/profile", authed.Then(ShowUserProfile))
 	//   http.Handle("/user/...", authed.Then(...))
 	//   http.Handle("/user/...", authed.Then(...))
 
-	log.Println("Serving on :8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	log.Println("Serving on http://localhost:8080/")
+	if err := http.ListenAndServe(":8080", mux); err != nil {
 		log.Fatal("Can't start webserver:", err)
 	}
 }
@@ -83,7 +83,7 @@ func ShowLandingPage(w http.ResponseWriter, u *User) {
 	}
 	fmt.Fprintln(w, `<p><hr>
         Login<br>
-        <form action='/login'>
+        <form action='/login' method='POST'>
             <input type='text' name='id'><br>
             <input type='submit'>
         </form>
@@ -111,7 +111,9 @@ func Login(w http.ResponseWriter, r *http.Request, udb UserDb, e *sandwich.LogEn
 	if err != nil {
 		log.Printf("No such user id: %q", r.FormValue("id"))
 		http.SetCookie(w, &http.Cookie{Name: "auth", Value: "", Expires: time.Now()})
-		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		// Redirect to /
+		fmt.Fprintf(w, `<html><head>
+			<meta http-equiv="refresh" content="0;URL='/'"/>`)
 		return
 	}
 
@@ -123,7 +125,9 @@ func Login(w http.ResponseWriter, r *http.Request, udb UserDb, e *sandwich.LogEn
 		MaxAge:   int(time.Hour / time.Second),
 		HttpOnly: true,
 	})
-	http.Redirect(w, r, "/user/profile", http.StatusTemporaryRedirect)
+	// Redirect to /user/profile
+	fmt.Fprintf(w, `<html><head>
+			<meta http-equiv="refresh" content="0;URL='/user/profile'"/>`)
 }
 
 func FailIfNotAuthenticated(u *User) (User, error) {

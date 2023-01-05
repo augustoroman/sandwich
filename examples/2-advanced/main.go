@@ -5,42 +5,38 @@
 // to sign in via a Google account or sign in using fake credentials.
 // This example demonstrates more advanced features of sandwich, including:
 //
-//  * Providing interface types to the middleware chain.
-//    TaskDb is the interface provided to the handlers, the actual value injected
-//    in main() is a taskDbImpl.
-//  * Using 3rd party middleware (go.auth, go.rice)
-//  * Using a 3rd party router (gorilla/mux)
-//  * Using multiple error handlers, and custom error handlers.
-//    Most web servers will want to server a custom HTML error page for user-facing
-//    error pages.  An example of that is included here.  For AJAX calls, however,
-//    ....
-//  * Early exit of the middleware chain via the sandwich.Done error
-//  * Auto-generating handler code
-//
+//   - Providing interface types to the middleware chain.
+//     TaskDb is the interface provided to the handlers, the actual value injected
+//     in main() is a taskDbImpl.
+//   - Using 3rd party middleware (go.auth, go.rice)
+//   - Using a 3rd party router (gorilla/mux)
+//   - Using multiple error handlers, and custom error handlers.
+//     Most web servers will want to server a custom HTML error page for user-facing
+//     error pages.  An example of that is included here.  For AJAX calls, however,
+//     ....
+//   - Early exit of the middleware chain via the sandwich.Done error
+//   - Auto-generating handler code
 package main
 
 import (
+	"embed"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"html/template"
-	"io/ioutil"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"time"
 
-	rice "github.com/GeertJohan/go.rice"
 	"github.com/augustoroman/sandwich"
 	auth "github.com/bradrydzewski/go.auth"
-	"github.com/gorilla/mux"
 )
 
-func main() {
-	gen := flag.Bool("gen", false, "Generate 'auto_handlers.go' instead of running the server.")
-	flag.Parse()
+//go:embed static
+var static embed.FS
 
+func main() {
 	// Read in configuration:
 	var config struct {
 		Host         string `json:"host"`
@@ -64,74 +60,56 @@ func main() {
 	taskDb := taskDbImpl{}
 
 	// Load our templates.
-	tpl := template.Must(template.ParseGlob("static/*.tpl.html"))
+	tpl := template.Must(template.ParseFS(static, "static/*.tpl.html"))
 
 	// Start setting up our server:
-	m := mux.NewRouter()
-	s := sandwich.TheUsual().
-		Then(ParseUserCookie, LogUser).
-		SetAs(taskDb, (*TaskDb)(nil)).
-		Set(tpl).
-		OnErr(CustomErrorPage)
+	mux := sandwich.TheUsual()
+	mux.Use(ParseUserCookie, LogUser)
+	mux.SetAs(taskDb, (*TaskDb)(nil))
+	mux.Set(tpl)
+	mux.OnErr(CustomErrorPage)
 
 	// Don't log these requests since we don't have a favicon, it's just a
 	// bunch of 404 spam.
-	m.Path("/favicon.ico").Handler(s.Then(sandwich.NoLog, NotFound))
+	mux.Get("/favicon.ico", sandwich.NoLog, NotFound)
 
 	// When login is called, we'll FIRST call our very own CheckForFakeLogin
 	// handler.  If we detect the fake login form params, we'll process that
 	// and then abort the middleware chain.
 	// However, if we don't have fake parameters, we'll continue on and let
 	// the authHandler take care of things.
-	m.Path("/auth/login").Handler(s.Then(CheckForFakeLogin, authHandler.ServeHTTP))
-	m.Path("/auth/google/callback").Handler(s.Then(authHandler.ServeHTTP))
+	mux.Any("/auth/login", CheckForFakeLogin, authHandler)
+	mux.Any("/auth/google/callback", authHandler)
 	// Note that we can use auth.DeleteUserCookie directly.
-	m.Path("/auth/logout").Handler(s.Then(auth.DeleteUserCookie,
-		http.RedirectHandler("/", http.StatusTemporaryRedirect).ServeHTTP))
+	mux.Any("/auth/logout", auth.DeleteUserCookie,
+		http.RedirectHandler("/", http.StatusTemporaryRedirect))
 
 	// Static file handling.  The s.Then(...) wrapper isn't strictly necessary,
 	// but it gives us logging (and potentially gzip or other middleware).
-	static := http.StripPrefix("/static/", http.FileServer(
-		rice.MustFindBox("static").HTTPBox()))
-	m.PathPrefix("/static/").Handler(s.Then(static.ServeHTTP))
+	// static := http.StripPrefix("/static", http.FileServer(http.FS(
+	// 	mustSubFS(static, "static"))))
+	mux.Get("/static/:path*", sandwich.ServeFS(static, "static", "path"))
 
 	// OK, here are the core handlers:
-	m.Path("/").Handler(s.Then(Home))
+	mux.Get("/", Home)
 	// All API calls will use the api middleware that responds with JSON for
 	// errors and requires users to be logged in.
-	api := s.OnErr(sandwich.HandleErrorJson).Then(RequireLoggedIn)
-	m.Path("/api/task").Methods("POST").Handler(api.Then(AddTask))
-	m.Path("/api/task/{id}").Methods("POST").Handler(api.Then(UpdateTask))
-
-	// For this example app, we'll duplicate the core functionality but use the
-	// automatically-generated handlers, just to show how they work:
-	m.Path("/auto/").HandlerFunc(Auto_Home(taskDb, tpl))
-	m.Path("/auto/api/task").Methods("POST").HandlerFunc(Auto_AddTask(taskDb, tpl))
-	m.Path("/auto/api/task/{id}").Methods("POST").HandlerFunc(Auto_UpdateTask(taskDb, tpl))
+	api := mux.SubRouter("/api/")
+	api.OnErr(sandwich.HandleErrorJson)
+	api.Use(RequireLoggedIn)
+	api.Post("/task", TaskFromAddRequest, TaskDb.Add, SendTaskAsJson)
+	api.Post("/task/:id", TaskOpFromUpdateRequest, UpdateTask)
 
 	// Catch all remaining URLs and respond with not-found errors.  We
 	// explicitly use the error-return mechanism so that we get the JSON
 	// response under /api/ and normal HTML responses elsewhere.
-	m.PathPrefix("/api/").Handler(api.Then(NotFound))
-	m.PathPrefix("/").Handler(s.Then(NotFound))
-
-	// If you ever update the handler code or middleware chain, re-run this
-	// with the -gen argument to re-create auto_handlers.go.
-	if *gen {
-		content := "package main\n" +
-			"// THIS FILE IS AUTOMATICALLY GENERATED\n\n" +
-			s.Then(Home).Code("main", "Auto_Home") + "\n" +
-			api.Then(AddTask).Code("main", "Auto_AddTask") + "\n" +
-			api.Then(UpdateTask).Code("main", "Auto_UpdateTask")
-		failOnError(ioutil.WriteFile("auto_handlers.go", []byte(content), 0644))
-		failOnError(exec.Command("goimports", "-w", "auto_handlers.go").Run())
-		return
-	}
+	api.Any("/:*", NotFound)
+	mux.Any("/:*", NotFound)
 
 	// Otherwise, start serving!
-	addr := fmt.Sprintf(":%d", config.Port)
-	log.Printf("Server listening on %s", addr)
-	failOnError(http.ListenAndServe(addr, m))
+	addr := fmt.Sprintf("localhost:%d", config.Port)
+	log.Printf("Server listening on http://%s", addr)
+	failOnError(http.ListenAndServe(addr, mux))
 }
 
 // ============================================================================
@@ -199,35 +177,43 @@ func Home(
 		"Tasks": tasks,
 	})
 }
-func AddTask(w http.ResponseWriter, r *http.Request, uid UserId, db TaskDb) error {
+
+func TaskFromAddRequest(r *http.Request) (*Task, error) {
 	var t Task
 	if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
-		return sandwich.Error{Code: http.StatusBadRequest, Cause: err}
+		return nil, sandwich.Error{Code: http.StatusBadRequest, Cause: err}
 	}
 	if t.Desc == "" {
-		return sandwich.Error{Code: http.StatusBadRequest,
+		return nil, sandwich.Error{Code: http.StatusBadRequest,
 			ClientMsg: "Please include a task description"}
 	}
-	if err := db.Add(uid, &t); err != nil {
-		return err
-	}
+	return &t, nil
+}
+
+func SendTaskAsJson(w http.ResponseWriter, t *Task) error {
 	return json.NewEncoder(w).Encode(map[string]interface{}{"task": t})
 }
-func UpdateTask(w http.ResponseWriter, r *http.Request, uid UserId, db TaskDb) error {
-	var op struct {
-		Toggle bool
-		Id     string
-	}
+
+type TaskOp struct {
+	Toggle bool
+	Id     string
+}
+
+func TaskOpFromUpdateRequest(r *http.Request) (TaskOp, error) {
+	var op TaskOp
 	if err := json.NewDecoder(r.Body).Decode(&op); err != nil {
-		return sandwich.Error{Code: http.StatusBadRequest, Cause: err}
+		return op, sandwich.Error{Code: http.StatusBadRequest, Cause: err}
 	}
 	if op.Id == "" {
-		return sandwich.Error{
+		return op, sandwich.Error{
 			Code:      http.StatusBadRequest,
 			ClientMsg: "Invalid op: missing task id",
 		}
 	}
+	return op, nil
+}
 
+func UpdateTask(w http.ResponseWriter, r *http.Request, uid UserId, op TaskOp, db TaskDb) error {
 	tasks, err := db.List(uid)
 	if err != nil {
 		return err
@@ -357,4 +343,12 @@ func failOnError(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func mustSubFS(base fs.FS, dir string) fs.FS {
+	sub, err := fs.Sub(base, dir)
+	if err != nil {
+		panic(err)
+	}
+	return sub
 }

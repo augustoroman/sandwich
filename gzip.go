@@ -18,19 +18,17 @@ const (
 // all subsequent handlers.
 //
 // For example, to gzip everything you could use:
-//   mw := sandwich.Gzip(sandwich.TheUsual())
-//   ...use as normal...
+//
+//	router.Use(sandwich.Gzip)
+//	...use as normal...
 //
 // Or, to gzip just a particular route you could do:
-//   mw := sandwich.TheUsual()
-//   ...add some middleware...
-//   http.Handle("/foo/bar", sandwich.Gzip(mw).Then(HandleFooBar))
+//
+//	router.Get("/foo/bar", sandwich.Gzip, MyHandleFooBar)
 //
 // Note that this does NOT auto-detect the content and disable compression for
 // already-compressed data (e.g. jpg images).
-func Gzip(mw Middleware) Middleware {
-	return mw.Wrap(provideGZipWriter, (*gZipWriter).Flush)
-}
+var Gzip = Wrap{provideGZipWriter, (*gZipWriter).Flush}
 
 func provideGZipWriter(w http.ResponseWriter, r *http.Request) (http.ResponseWriter, *gZipWriter) {
 	if !strings.Contains(r.Header.Get(headerAcceptEncoding), "gzip") {

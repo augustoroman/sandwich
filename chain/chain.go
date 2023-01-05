@@ -9,63 +9,62 @@
 // automatically determine how to provide dependencies -- it merely uses the
 // most recently-provided value. This enables chains to report errors
 // immediately during the chain construction and, if successfully constructed, a
-// chain will always be able to be executed.
+// chain can always be executed.
 //
-// HTTP Middleware Example
+// # HTTP Middleware Example
 //
 // As a common example, chains in http handling middleware typically start with
 // the http.ResponseWriter and *http.Request provided by the http framework:
 //
-//   base := chain.Func{}.
-//     Arg((*http.ResponseWriter)(nil)).  // declared as an arg when Run
-//     Arg((*http.Request)(nil)).         // declared as an arg when Run
+//	base := chain.Func{}.
+//	  Arg((*http.ResponseWriter)(nil)).  // declared as an arg when Run
+//	  Arg((*http.Request)(nil)).         // declared as an arg when Run
 //
 // Given the following functions:
 //
-//   func GetDB() (*UserDB, error) {...}
-//   func GetUserFromRequest(db *UserDB, req *http.Request) (*User, error) {...}
-//   func SendUserAsJSON(w http.ResponseWriter, u *User) error {...}
+//	func GetDB() (*UserDB, error) {...}
+//	func GetUserFromRequest(db *UserDB, req *http.Request) (*User, error) {...}
+//	func SendUserAsJSON(w http.ResponseWriter, u *User) error {...}
 //
-//   func GetUserID(r *http.Request) (UserID, error) {...}
-//   func (db *UserDB) Lookup(UserID) (*User, error) { ... }
+//	func GetUserID(r *http.Request) (UserID, error) {...}
+//	func (db *UserDB) Lookup(UserID) (*User, error) { ... }
 //
-//   func SendProjectAsJSON(w http.ResponseWriter, p *Project) error {...}
+//	func SendProjectAsJSON(w http.ResponseWriter, p *Project) error {...}
 //
 // then these chains would work fine:
 //
-//   base.Then(
-//     GetDB,              // takes no args ✅, provides *UserDB to later funcs
-//     GetUserFromRequest, // takes *UserDB ✅ and *Request ✅, provides *User
-//     SendUserAsJSON,     // takes ResponseWriter ✅ and *User ✅
-//   )
+//	base.Then(
+//	  GetDB,              // takes no args ✅, provides *UserDB to later funcs
+//	  GetUserFromRequest, // takes *UserDB ✅ and *Request ✅, provides *User
+//	  SendUserAsJSON,     // takes ResponseWriter ✅ and *User ✅
+//	)
 //
-//   base.Then(
-//     GetDB,            // takes no args ✅, provides *UserDB to later funcs
-//     GetUserID,        // takes *Request ✅, provides UserID
-//     (*UserDB).Lookup, // takes *UserDB ✅ and UserID ✅, provides *User
-//     SendUserAsJSON,   // takes ResponseWriter ✅ and *User ✅
-//   )
+//	base.Then(
+//	  GetDB,            // takes no args ✅, provides *UserDB to later funcs
+//	  GetUserID,        // takes *Request ✅, provides UserID
+//	  (*UserDB).Lookup, // takes *UserDB ✅ and UserID ✅, provides *User
+//	  SendUserAsJSON,   // takes ResponseWriter ✅ and *User ✅
+//	)
 //
 // but these chains would fail:
 //
-//   base.Then(
-//     GetUserFromRequest, // takes *UserDB ❌ and *Request ✅
-//     GetDB,              // this *UserDB isn't available yet.
-//     SendUserAsJSON,     //
-//   )
+//	base.Then(
+//	  GetUserFromRequest, // takes *UserDB ❌ and *Request ✅
+//	  GetDB,              // this *UserDB isn't available yet.
+//	  SendUserAsJSON,     //
+//	)
 //
-//   base.Then(
-//     GetDB,             // takes no args ✅, provides *UserDB to later funcs
-//     GetUserID,         // takes *Request ✅, provides UserID
-//     (*UserDB).Lookup,  // takes *UserDB ✅ and UserID ✅, provides *User
-//     SendProjectAsJSON, // takes ResponseWriter ✅ and *Project ❌
-//   )
+//	base.Then(
+//	  GetDB,             // takes no args ✅, provides *UserDB to later funcs
+//	  GetUserID,         // takes *Request ✅, provides UserID
+//	  (*UserDB).Lookup,  // takes *UserDB ✅ and UserID ✅, provides *User
+//	  SendProjectAsJSON, // takes ResponseWriter ✅ and *Project ❌
+//	)
 //
-//   base.Then(
-//     GetUserFromRequest, // takes *UserDB ❌ and *Request ✅
-//     SendUserAsJSON,     //
-//   )
-//
+//	base.Then(
+//	  GetUserFromRequest, // takes *UserDB ❌ and *Request ✅
+//	  SendUserAsJSON,     //
+//	)
 package chain
 
 import (

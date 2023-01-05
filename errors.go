@@ -8,12 +8,17 @@ import (
 
 // Error is an error implementation that provides the ability to specify three
 // things to the sandwich error handler:
-//   * The HTTP status code that should be used in the response.
-//   * The client-facing message that should be sent.  Typically this is a
+//   - The HTTP status code that should be used in the response.
+//   - The client-facing message that should be sent.  Typically this is a
 //     sanitized error message, such as "Internal Server Error".
-//   * Internal debugging detail including a log message and the underlying
+//   - Internal debugging detail including a log message and the underlying
 //     error that should be included in the server logs.
+//
 // Note that Cause may be nil.
+//
+// The sandwich standard Error handlers (HandleError and HandleErrorJson) will
+// respect these Errors and respond with the appropriate status code and client
+// message. Additionally, the sandwich standard log handling will log LogMsg.
 type Error struct {
 	Code      int
 	ClientMsg string
@@ -51,17 +56,22 @@ var Done = errors.New("<done>")
 // generic 500 Error (internal server error) will be initialized and returned.
 // Note that if err is nil, it will still return a generic 500 Error.
 func ToError(err error) Error {
-	e, ok := err.(Error)
-	if !ok {
-		e = Error{LogMsg: "Failure", Cause: err}
+	var e Error
+	if errors.As(err, &e) {
+		if e.Code == 0 {
+			e.Code = 500
+		}
+		if e.ClientMsg == "" {
+			e.ClientMsg = http.StatusText(e.Code)
+		}
+		return e
 	}
-	if e.Code == 0 {
-		e.Code = 500
+	return Error{
+		Code:      http.StatusInternalServerError,
+		LogMsg:    "Failure",
+		Cause:     err,
+		ClientMsg: http.StatusText(http.StatusInternalServerError),
 	}
-	if e.ClientMsg == "" {
-		e.ClientMsg = http.StatusText(e.Code)
-	}
-	return e
 }
 
 // HandleError is the default error handler included in sandwich.TheUsual.

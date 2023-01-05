@@ -2,9 +2,9 @@ package sandwich
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 )
 
@@ -22,173 +22,105 @@ func write204(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.Statu
 func hello(w http.ResponseWriter, r *http.Request)    { _, _ = w.Write([]byte("Hello there!")) }
 func sendjson(w http.ResponseWriter, r *http.Request) { _ = json.NewEncoder(w).Encode(userInfo) }
 
-func makeWrite204_TheUsual() Middleware { return TheUsual().Then(NoLog, write204) }
-func makeWrite204_Bare() Middleware     { return New().Then(write204) }
-func makeHello_TheUsual() Middleware    { return TheUsual().Then(NoLog, hello) }
-func makeHello_Bare() Middleware        { return New().Then(hello) }
-func makeSendJson_TheUsual() Middleware { return TheUsual().Then(NoLog, sendjson) }
-func makeSendJson_Bare() Middleware     { return New().Then(sendjson) }
+func addTestRoutes(mux Router) {
+	mux.Get("/204", write204)
+	mux.Get("/hello", hello)
+	mux.Get("/jsonuser", sendjson)
 
-func bench(N int, h http.Handler) {
-	req := httptest.NewRequest("GET", "/", nil)
+	mux.Get("/long/1/2/3/4/5/6/7/8/9/xyz/204", write204)
+	mux.Get("/long/1/2/3/4/5/6/7/8/9/xyz/hello", hello)
+	mux.Get("/long/1/2/3/4/5/6/7/8/9/xyz/jsonuser", sendjson)
+
+	mux.Get("/1param/:var/204", write204)
+	mux.Get("/1param/:var/hello", hello)
+	mux.Get("/1param/:var/jsonuser", sendjson)
+
+	mux.Get("/manyparams/:var/:x/:y/:z/:a/:b/:c/204", write204)
+	mux.Get("/manyparams/:var/:x/:y/:z/:a/:b/:c/hello", hello)
+	mux.Get("/manyparams/:var/:x/:y/:z/:a/:b/:c/jsonuser", sendjson)
+
+	mux.Get("/greedy/:var*/204", write204)
+	mux.Get("/greedy/:var*/hello", hello)
+	mux.Get("/greedy/:var*/jsonuser", sendjson)
+}
+
+var usualRouter = func() Router {
+	mux := TheUsual()
+	mux.Use(NoLog)
+	addTestRoutes(mux)
+	return mux
+}()
+var bareRouter = func() Router {
+	mux := BuildYourOwn()
+	addTestRoutes(mux)
+	return mux
+}()
+
+func bench(N int, route string, mux Router) {
+	req := httptest.NewRequest("GET", route, nil)
 	for i := 0; i < N; i++ {
 		w := httptest.NewRecorder()
-		h.ServeHTTP(w, req)
+		mux.ServeHTTP(w, req)
+	}
+}
+
+func S(s ...string) []string { return s }
+
+func runBenches(b *testing.B, mux Router, routes, endpoints []string) {
+	for _, ep := range endpoints {
+		for _, route := range routes {
+			path := route + "/" + ep
+			b.Run(ep+"::"+path, func(b *testing.B) {
+				bench(b.N, path, mux)
+			})
+		}
 	}
 }
 
 // Just to shorten the following benchmark functions:
 type Handler = http.HandlerFunc
 
-func Benchmark_Hello_RawHTTP(b *testing.B)            { bench(b.N, Handler(hello)) }
-func Benchmark_Hello_Generated_Bare(b *testing.B)     { bench(b.N, Handler(gen_hello_bare())) }
-func Benchmark_Hello_Generated_TheUsual(b *testing.B) { bench(b.N, Handler(gen_hello_theusual())) }
-func Benchmark_Hello_Dynamic_Bare(b *testing.B)       { bench(b.N, makeHello_Bare()) }
-func Benchmark_Hello_Dynamic_TheUsual(b *testing.B)   { bench(b.N, makeHello_TheUsual()) }
-
-func Benchmark_Write204_RawHTTP(b *testing.B)        { bench(b.N, Handler(write204)) }
-func Benchmark_Write204_Generated_Bare(b *testing.B) { bench(b.N, Handler(gen_write204_bare())) }
-func Benchmark_Write204_Generated_TheUsual(b *testing.B) {
-	bench(b.N, Handler(gen_write204_theusual()))
+func BenchmarkUsual(b *testing.B) {
+	runBenches(b, usualRouter,
+		S("", "/long/1/2/3/4/5/6/7/8/9/xyz", "/1param/foo", "/manyparams/foo/x/y/z/a/b/c", "/greedy/short", "/greedy/x/y/z/a/b/c"),
+		S("204", "hello", "jsonuser"),
+	)
 }
-func Benchmark_Write204_Dynamic_Bare(b *testing.B)     { bench(b.N, makeWrite204_Bare()) }
-func Benchmark_Write204_Dynamic_TheUsual(b *testing.B) { bench(b.N, makeWrite204_TheUsual()) }
-
-func Benchmark_SendJson_RawHTTP(b *testing.B)        { bench(b.N, Handler(sendjson)) }
-func Benchmark_SendJson_Generated_Bare(b *testing.B) { bench(b.N, Handler(gen_sendjson_bare())) }
-func Benchmark_SendJson_Generated_TheUsual(b *testing.B) {
-	bench(b.N, Handler(gen_sendjson_theusual()))
-}
-func Benchmark_SendJson_Dynamic_Bare(b *testing.B)     { bench(b.N, makeSendJson_Bare()) }
-func Benchmark_SendJson_Dynamic_TheUsual(b *testing.B) { bench(b.N, makeSendJson_TheUsual()) }
-
-func TestGenBenchmarkCode(t *testing.T) {
-	gen_functions := []string{
-		makeHello_Bare().Code("sandwich", "gen_hello_bare"),
-		makeHello_TheUsual().Code("sandwich", "gen_hello_theusual"),
-		makeWrite204_Bare().Code("sandwich", "gen_write204_bare"),
-		makeWrite204_TheUsual().Code("sandwich", "gen_write204_theusual"),
-		makeSendJson_Bare().Code("sandwich", "gen_sendjson_bare"),
-		makeSendJson_TheUsual().Code("sandwich", "gen_sendjson_theusual"),
-	}
-	gen_code := "\n\n" + strings.Join(gen_functions, "\n\n") + "\n\n"
-	t.Log("Generated code: " + gen_code)
+func BenchmarkBare(b *testing.B) {
+	runBenches(b, bareRouter,
+		S("", "/long/1/2/3/4/5/6/7/8/9/xyz", "/1param/foo", "/manyparams/foo/x/y/z/a/b/c", "/greedy/short", "/greedy/x/y/z/a/b/c"),
+		S("204", "hello", "jsonuser"),
+	)
 }
 
-// ---------------------------------------------------------------------------
-// Auto-generated code below here
-// ---------------------------------------------------------------------------
-
-func gen_hello_bare() func(
-	rw http.ResponseWriter,
-	req *http.Request,
-) {
-	return func(
-		rw http.ResponseWriter,
-		req *http.Request,
-	) {
-		hello(rw, req)
-
+func BenchmarkCalls(b *testing.B) {
+	for i := 1; i < 20; i += 2 {
+		b.Run(fmt.Sprintf("%02d", i), func(b *testing.B) {
+			var calls []any
+			for j := 0; j < i; j++ {
+				calls = append(calls, hello)
+			}
+			mux := BuildYourOwn()
+			mux.Get("/", calls...)
+			b.ResetTimer()
+			bench(b.N, "/", mux)
+		})
 	}
 }
 
-func gen_hello_theusual() func(
-	rw http.ResponseWriter,
-	req *http.Request,
-) {
-	return func(
-		rw http.ResponseWriter,
-		req *http.Request,
-	) {
-		var pResponseWriter *ResponseWriter
-		rw, pResponseWriter = WrapResponseWriter(rw)
+// func Benchmark_Usual_Short_Write204(b *testing.B) { bench(b.N, "/204", usualRouter) }
+// func Benchmark_Usual_Short_Hello(b *testing.B)    { bench(b.N, "/hello", usualRouter) }
+// func Benchmark_Usual_Short_SnedJson(b *testing.B) { bench(b.N, "/204", usualRouter) }
 
-		var pLogEntry *LogEntry
-		pLogEntry = StartLog(req)
+// // func Benchmark_Hello_RawHTTP(b *testing.B)          { bench(b.N, Handler(hello)) }
+// // func Benchmark_Hello_Dynamic_Bare(b *testing.B)     { bench(b.N, makeHello_Bare()) }
+// // func Benchmark_Hello_Dynamic_TheUsual(b *testing.B) { bench(b.N, makeHello_TheUsual()) }
 
-		defer func() {
-			(*LogEntry).Commit(pLogEntry, pResponseWriter)
-		}()
+// // func Benchmark_Write204_RawHTTP(b *testing.B) { bench(b.N, Handler(write204)) }
 
-		NoLog(pLogEntry)
+// // func Benchmark_Write204_Dynamic_Bare(b *testing.B)     { bench(b.N, makeWrite204_Bare()) }
+// // func Benchmark_Write204_Dynamic_TheUsual(b *testing.B) { bench(b.N, makeWrite204_TheUsual()) }
 
-		hello(rw, req)
-
-	}
-}
-
-func gen_write204_bare() func(
-	rw http.ResponseWriter,
-	req *http.Request,
-) {
-	return func(
-		rw http.ResponseWriter,
-		req *http.Request,
-	) {
-		write204(rw, req)
-
-	}
-}
-
-func gen_write204_theusual() func(
-	rw http.ResponseWriter,
-	req *http.Request,
-) {
-	return func(
-		rw http.ResponseWriter,
-		req *http.Request,
-	) {
-		var pResponseWriter *ResponseWriter
-		rw, pResponseWriter = WrapResponseWriter(rw)
-
-		var pLogEntry *LogEntry
-		pLogEntry = StartLog(req)
-
-		defer func() {
-			(*LogEntry).Commit(pLogEntry, pResponseWriter)
-		}()
-
-		NoLog(pLogEntry)
-
-		write204(rw, req)
-
-	}
-}
-
-func gen_sendjson_bare() func(
-	rw http.ResponseWriter,
-	req *http.Request,
-) {
-	return func(
-		rw http.ResponseWriter,
-		req *http.Request,
-	) {
-		sendjson(rw, req)
-
-	}
-}
-
-func gen_sendjson_theusual() func(
-	rw http.ResponseWriter,
-	req *http.Request,
-) {
-	return func(
-		rw http.ResponseWriter,
-		req *http.Request,
-	) {
-		var pResponseWriter *ResponseWriter
-		rw, pResponseWriter = WrapResponseWriter(rw)
-
-		var pLogEntry *LogEntry
-		pLogEntry = StartLog(req)
-
-		defer func() {
-			(*LogEntry).Commit(pLogEntry, pResponseWriter)
-		}()
-
-		NoLog(pLogEntry)
-
-		sendjson(rw, req)
-
-	}
-}
+// // func Benchmark_SendJson_RawHTTP(b *testing.B)          { bench(b.N, Handler(sendjson)) }
+// // func Benchmark_SendJson_Dynamic_Bare(b *testing.B)     { bench(b.N, makeSendJson_Bare()) }
+// // func Benchmark_SendJson_Dynamic_TheUsual(b *testing.B) { bench(b.N, makeSendJson_TheUsual()) }

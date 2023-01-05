@@ -70,13 +70,16 @@ func TestLogger(t *testing.T) {
 	var resp *httptest.ResponseRecorder
 	var req *http.Request
 
+	mux := TheUsual()
+
 	// Test a normal response:
 	logBuf.Reset()
 	resp = httptest.NewRecorder()
 	req, _ = http.NewRequest("GET", "/", nil)
 	req.RequestURI = req.URL.String()
 	req.Header.Add("X-Real-IP", "123.456.789.0")
-	TheUsual().Then(addsNote).ServeHTTP(resp, req)
+	mux.Get("/", addsNote)
+	mux.ServeHTTP(resp, req)
 	validateLogMessage(t, logBuf.String(), _GREEN,
 		`2001-02-03T04:05:06Z 123.456.789.0 "GET /" (200 8B 13ms)   a="x" b="y"`)
 
@@ -86,7 +89,8 @@ func TestLogger(t *testing.T) {
 	req, _ = http.NewRequest("POST", "/slow", nil)
 	req.RequestURI = req.URL.String()
 	req.Header.Add("X-Forwarded-For", "<any string>")
-	TheUsual().Then(slowSendMsg).ServeHTTP(resp, req)
+	mux.Post("/slow", slowSendMsg)
+	mux.ServeHTTP(resp, req)
 	validateLogMessage(t, logBuf.String(), _YELLOW,
 		`2001-02-03T04:05:06Z <any string> "POST /slow" (200 8B 113ms)`)
 
@@ -96,7 +100,8 @@ func TestLogger(t *testing.T) {
 	req, _ = http.NewRequest("BOO!", "/fail", nil)
 	req.RequestURI = req.URL.String()
 	req.RemoteAddr = "[::1]:56596"
-	TheUsual().Then(fail).ServeHTTP(resp, req)
+	mux.On("BOO!", "/fail", fail)
+	mux.ServeHTTP(resp, req)
 	validateLogMessage(t, logBuf.String(), _RED,
 		`2001-02-03T04:05:06Z [::1]:56596 "BOO! /fail" (500 22B 13ms) `+"\n"+
 			`  ERROR: (500) Failure: It went horribly wrong`)
@@ -109,7 +114,8 @@ func TestLogger(t *testing.T) {
 	req.RemoteAddr = "[::1]:56596"
 	req.Header.Add("X-Forwarded-For", "<any string>")
 	req.Header.Add("X-Real-IP", "123.456.789.0") // takes precedence
-	TheUsual().Then(slowFail).ServeHTTP(resp, req)
+	mux.Put("/slowfail", slowFail)
+	mux.ServeHTTP(resp, req)
 	validateLogMessage(t, logBuf.String(), _RED,
 		`2001-02-03T04:05:06Z 123.456.789.0 "PUT /slowfail" (500 22B 1.013s) `+"\n"+
 			`  ERROR: (500) Failure: It went horribly wrong`)
@@ -117,8 +123,9 @@ func TestLogger(t *testing.T) {
 	// Test a suppressed log.
 	logBuf.Reset()
 	resp = httptest.NewRecorder()
-	req, _ = http.NewRequest("GET", "/", nil)
-	TheUsual().Then(NoLog, addsNote).ServeHTTP(resp, req)
+	req, _ = http.NewRequest("GET", "/nolog", nil)
+	mux.Get("/nolog", NoLog, addsNote)
+	mux.ServeHTTP(resp, req)
 	if logBuf.String() != "" {
 		t.Errorf("Expected no log output, but got [%s]", logBuf.String())
 	}
@@ -127,10 +134,11 @@ func TestLogger(t *testing.T) {
 	var log LogEntry
 	WriteLog = func(e LogEntry) { log = e }
 	resp = httptest.NewRecorder()
-	req, _ = http.NewRequest("PUT", "/slowfail", nil)
+	req, _ = http.NewRequest("PUT", "/panic", nil)
 	req.RequestURI = req.URL.String()
 	req.RemoteAddr = "<remote>"
-	TheUsual().Then(panics).ServeHTTP(resp, req)
+	mux.Put("/panic", panics)
+	mux.ServeHTTP(resp, req)
 
 	if err, ok := ToError(log.Error).Cause.(chain.PanicError); !ok {
 		t.Errorf("log error should be a panic, but is: %#v", log.Error)

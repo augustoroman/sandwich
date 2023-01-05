@@ -3,7 +3,7 @@ package sandwich
 import (
 	"compress/gzip"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,7 +13,9 @@ func TestGzip(t *testing.T) {
 	greet := func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hi there!")
 	}
-	handler := Gzip(New()).Then(greet)
+	handler := BuildYourOwn()
+	handler.Use(Gzip)
+	handler.Any("/", greet)
 
 	resp := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/", nil)
@@ -33,7 +35,7 @@ func TestGzip(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	if body, err := ioutil.ReadAll(r); err != nil {
+	if body, err := io.ReadAll(r); err != nil {
 		t.Fatal(err)
 	} else if string(body) != "Hi there!" {
 		t.Errorf("Wrong response: %q", string(body))

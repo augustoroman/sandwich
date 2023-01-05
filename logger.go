@@ -22,13 +22,13 @@ var os_Stderr io.Writer = os.Stderr
 //
 // For example:
 //
-//    func MyAuthCheck(r *http.Request, e *sandwich.LogEntry) (User, error) {
-//        user, err := decodeAuthCookie(r)
-//        if user != nil {
-//            e.Note["user"] = user.Id()  // indicate which user is auth'd
-//        }
-//        return user, err
-//    }
+//	func MyAuthCheck(r *http.Request, e *sandwich.LogEntry) (User, error) {
+//	    user, err := decodeAuthCookie(r)
+//	    if user != nil {
+//	        e.Note["user"] = user.Id()  // indicate which user is auth'd
+//	    }
+//	    return user, err
+//	}
 type LogEntry struct {
 	RemoteIp     string
 	Start        time.Time
@@ -38,22 +38,27 @@ type LogEntry struct {
 	Elapsed      time.Duration
 	Error        error
 	Note         map[string]string
-	Quiet        bool // set to true to suppress logging this request
+	// set to true to suppress logging this request
+	Quiet bool
 }
 
 // NoLog is a middleware function that suppresses log output for this request.
 // For example:
 //
-//    // suppress logging of the favicon request to reduce log spam.
-//    http.Handle("/favicon.ico", s.Then(NoLog, staticHandler))
+//	// suppress logging of the favicon request to reduce log spam.
+//	router.Get("/favicon.ico", sandwich.NoLog, staticHandler)
 //
 // This depends on WriteLog respecting the Quiet flag, which the default
 // implementation does.
 func NoLog(e *LogEntry) { e.Quiet = true }
 
-// StartLog creates a *LogEntry and initializes it with basic request
+// LogRequests is a middleware wrap that creates a log entry during middleware
+// processing and then commits the log entry after the middleware has executed.
+var LogRequests = Wrap{NewLogEntry, (*LogEntry).Commit}
+
+// NewLogEntry creates a *LogEntry and initializes it with basic request
 // information.
-func StartLog(r *http.Request) *LogEntry {
+func NewLogEntry(r *http.Request) *LogEntry {
 	return &LogEntry{
 		RemoteIp: remoteIp(r),
 		Start:    time_Now(),
@@ -123,7 +128,8 @@ func logColors(e LogEntry) (start, reset string) {
 
 // remoteIp extracts the remote IP from the request.  Adapted from code in
 // Martini:
-//   https://github.com/go-martini/martini/blob/1d33529c15f19/logger.go#L14..L20
+//
+//	https://github.com/go-martini/martini/blob/1d33529c15f19/logger.go#L14..L20
 func remoteIp(r *http.Request) string {
 	if addr := r.Header.Get("X-Real-IP"); addr != "" {
 		return addr

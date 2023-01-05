@@ -15,11 +15,6 @@ This example demonstrates more advanced features of sandwich, including:
   error handler decides what format to respond in.
 * Early exit of the middleware chain via the sandwich.Done error <br/>
   See `CheckForFakeLogin()` for usage.
-* Auto-generating handler code <br/>
-  Besides using the normal sandwich middleware flow, this example also shows how
-  to generate & use auto-generated handlers.  See the "auto_handlers.go" file
-  for an example of the generated code, and the /auto/* endpoints use the
-  automatic handlers.
 
 ## Google Login (Oauth2 Authentication)
 
